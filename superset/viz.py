@@ -571,7 +571,7 @@ class BaseViz(object):
 
     @property
     def json_data(self):
-        # return json.dumps(self.data)
+        return json.dumps(self.data)
 
 
 class FunnelViz(BaseViz):
@@ -1024,7 +1024,7 @@ class TimeTableViz(BaseViz):
         )
 
 
-# class PivotTableViz(BaseViz):
+class PivotTableViz(BaseViz):
     """A pivot table view, define your rows, columns and metrics"""
 
     viz_type = 'pivot_table'
