@@ -1104,7 +1104,7 @@ class SeparatorViz(MarkupViz):
     verbose_name = _('Separator')
 
 
-class WordCloudViz(BaseViz):
+# class WordCloudViz(BaseViz):
     """Build a colorful word cloud
 
     Uses the nice library at:
