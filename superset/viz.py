@@ -1302,7 +1302,7 @@ class BoxPlotViz(NVD3Viz):
         return chart_data
 
 
-# class BubbleViz(NVD3Viz):
+class BubbleViz(NVD3Viz):
     """Based on the NVD3 bubble chart"""
 
     viz_type = 'bubble'
