@@ -1399,7 +1399,7 @@ class BulletViz(NVD3Viz):
         }
 
 
-class BigNumberViz(BaseViz):
+# class BigNumberViz(BaseViz):
     """Put emphasis on a single metric with this big number viz"""
 
     viz_type = 'big_number'
