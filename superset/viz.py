@@ -1737,7 +1737,7 @@ class NVD3TimeSeriesBarViz(NVD3TimeSeriesViz):
     verbose_name = _('Time Series - Bar Chart')
 
 
-# class NVD3TimePivotViz(NVD3TimeSeriesViz):
+class NVD3TimePivotViz(NVD3TimeSeriesViz):
     """Time Series - Periodicity Pivot"""
 
     viz_type = 'time_pivot'
