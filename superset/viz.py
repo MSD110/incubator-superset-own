@@ -1811,7 +1811,7 @@ class DistributionPieViz(NVD3Viz):
         return df.to_dict(orient='records')
 
 
-# class HistogramViz(BaseViz):
+class HistogramViz(BaseViz):
     """Histogram"""
 
     viz_type = 'histogram'
