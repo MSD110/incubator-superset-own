@@ -1925,7 +1925,7 @@ class DistributionBarViz(DistributionPieViz):
         return chart_data
 
 
-class SunburstViz(BaseViz):
+# class SunburstViz(BaseViz):
     """A multi level sunburst chart"""
 
     viz_type = 'sunburst'
