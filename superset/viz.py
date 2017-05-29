@@ -2005,7 +2005,7 @@ class SankeyViz(BaseViz):
         return recs
 
 
-# class DirectedForceViz(BaseViz):
+class DirectedForceViz(BaseViz):
     """An animated directed force layout graph visualization"""
 
     viz_type = 'directed_force'
