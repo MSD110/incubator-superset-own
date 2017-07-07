@@ -2232,7 +2232,7 @@ class ParallelCoordinatesViz(BaseViz):
         return df.to_dict(orient='records')
 
 
-# class HeatmapViz(BaseViz):
+class HeatmapViz(BaseViz):
     """A nice heatmap visualization that support high density through canvas"""
 
     viz_type = 'heatmap'
