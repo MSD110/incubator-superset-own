@@ -2297,7 +2297,7 @@ class HorizonViz(NVD3TimeSeriesViz):
         'd3-horizon-chart</a>')
 
 
-class MapboxViz(BaseViz):
+# class MapboxViz(BaseViz):
     """Rich maps made with Mapbox"""
 
     viz_type = 'mapbox'
