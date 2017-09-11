@@ -2413,7 +2413,7 @@ class MapboxViz(BaseViz):
         }
 
 
-# class DeckGLMultiLayer(BaseViz):
+class DeckGLMultiLayer(BaseViz):
     """Pile on multiple DeckGL layers"""
 
     viz_type = 'deck_multi'
