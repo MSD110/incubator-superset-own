@@ -2787,7 +2787,7 @@ class DeckHex(BaseDeckGLViz):
         return super(DeckHex, self).get_data(df)
 
 
-# class DeckGeoJson(BaseDeckGLViz):
+class DeckGeoJson(BaseDeckGLViz):
     """deck.gl's GeoJSONLayer"""
 
     viz_type = 'deck_geojson'
