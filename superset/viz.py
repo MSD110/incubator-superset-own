@@ -2805,7 +2805,7 @@ class DeckGeoJson(BaseDeckGLViz):
         return json.loads(geojson)
 
 
-# class DeckArc(BaseDeckGLViz):
+class DeckArc(BaseDeckGLViz):
     """deck.gl's Arc Layer"""
 
     viz_type = 'deck_arc'
