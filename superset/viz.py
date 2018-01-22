@@ -1435,7 +1435,7 @@ class BigNumberTotalViz(BaseViz):
         return d
 
 
-# class NVD3TimeSeriesViz(NVD3Viz):
+class NVD3TimeSeriesViz(NVD3Viz):
     """A rich line chart component with tons of options"""
 
     viz_type = 'line'
