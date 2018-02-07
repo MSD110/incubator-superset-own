@@ -1729,7 +1729,7 @@ class NVD3DualLineViz(NVD3Viz):
         return chart_data
 
 
-# class NVD3TimeSeriesBarViz(NVD3TimeSeriesViz):
+class NVD3TimeSeriesBarViz(NVD3TimeSeriesViz):
     """A bar chart where the x axis is time"""
 
     viz_type = 'bar'
