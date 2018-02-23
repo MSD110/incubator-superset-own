@@ -1784,7 +1784,7 @@ class NVD3CompareTimeSeriesViz(NVD3TimeSeriesViz):
     verbose_name = _('Time Series - Percent Change')
 
 
-# class NVD3TimeSeriesStackedViz(NVD3TimeSeriesViz):
+class NVD3TimeSeriesStackedViz(NVD3TimeSeriesViz):
     """A rich stack area chart"""
 
     viz_type = 'area'
