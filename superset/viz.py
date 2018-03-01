@@ -1792,7 +1792,7 @@ class NVD3TimeSeriesStackedViz(NVD3TimeSeriesViz):
     sort_series = True
 
 
-class DistributionPieViz(NVD3Viz):
+# class DistributionPieViz(NVD3Viz):
     """Annoy visualization snobs with this controversial pie chart"""
 
     viz_type = 'pie'
