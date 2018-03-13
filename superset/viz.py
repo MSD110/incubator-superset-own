@@ -1857,7 +1857,7 @@ class HistogramViz(BaseViz):
         return chart_data
 
 
-class DistributionBarViz(DistributionPieViz):
+# class DistributionBarViz(DistributionPieViz):
     """A good old bar chart"""
 
     viz_type = 'dist_bar'
