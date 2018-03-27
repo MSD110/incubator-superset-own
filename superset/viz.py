@@ -1955,7 +1955,7 @@ class SunburstViz(BaseViz):
         return qry
 
 
-class SankeyViz(BaseViz):
+# class SankeyViz(BaseViz):
     """A Sankey diagram that requires a parent-child dataset"""
 
     viz_type = 'sankey'
