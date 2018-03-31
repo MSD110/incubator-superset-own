@@ -2025,7 +2025,7 @@ class DirectedForceViz(BaseViz):
         return df.to_dict(orient='records')
 
 
-class ChordViz(BaseViz):
+# class ChordViz(BaseViz):
     """A Chord diagram"""
 
     viz_type = 'chord'
