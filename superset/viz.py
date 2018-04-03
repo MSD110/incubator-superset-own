@@ -2057,7 +2057,7 @@ class ChordViz(BaseViz):
         }
 
 
-class CountryMapViz(BaseViz):
+# class CountryMapViz(BaseViz):
     """A country centric"""
 
     viz_type = 'country_map'
