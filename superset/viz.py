@@ -2084,7 +2084,7 @@ class CountryMapViz(BaseViz):
         return d
 
 
-class WorldMapViz(BaseViz):
+# class WorldMapViz(BaseViz):
     """A country centric world map"""
 
     viz_type = 'world_map'
