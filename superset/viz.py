@@ -2190,7 +2190,7 @@ class FilterBoxViz(BaseViz):
         return d
 
 
-class IFrameViz(BaseViz):
+# class IFrameViz(BaseViz):
     """You can squeeze just about anything in this iFrame component"""
 
     viz_type = 'iframe'
