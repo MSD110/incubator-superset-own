@@ -2208,7 +2208,7 @@ class IFrameViz(BaseViz):
         return {}
 
 
-class ParallelCoordinatesViz(BaseViz):
+# class ParallelCoordinatesViz(BaseViz):
     """Interactive parallel coordinate implementation
 
     Uses this amazing javascript library
