@@ -2284,7 +2284,7 @@ class HeatmapViz(BaseViz):
         }
 
 
-# class HorizonViz(NVD3TimeSeriesViz):
+class HorizonViz(NVD3TimeSeriesViz):
     """Horizon chart
 
     https://www.npmjs.com/package/d3-horizon-chart
