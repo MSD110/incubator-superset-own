@@ -2695,7 +2695,7 @@ def geohash_to_json(geohash_code):
     ]
 
 
-class DeckPathViz(BaseDeckGLViz):
+# class DeckPathViz(BaseDeckGLViz):
     """deck.gl's PathLayer"""
 
     viz_type = 'deck_path'
