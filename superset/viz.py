@@ -2741,7 +2741,7 @@ class DeckPathViz(BaseDeckGLViz):
         return super(DeckPathViz, self).get_data(df)
 
 
-# class DeckPolygon(DeckPathViz):
+class DeckPolygon(DeckPathViz):
     """deck.gl's Polygon Layer"""
 
     viz_type = 'deck_polygon'
@@ -2769,7 +2769,7 @@ class DeckPathViz(BaseDeckGLViz):
         return d
 
 
-class DeckHex(BaseDeckGLViz):
+# class DeckHex(BaseDeckGLViz):
     """deck.gl's DeckLayer"""
 
     viz_type = 'deck_hex'
