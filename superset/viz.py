@@ -2769,7 +2769,7 @@ class DeckPolygon(DeckPathViz):
         return d
 
 
-# class DeckHex(BaseDeckGLViz):
+class DeckHex(BaseDeckGLViz):
     """deck.gl's DeckLayer"""
 
     viz_type = 'deck_hex'
