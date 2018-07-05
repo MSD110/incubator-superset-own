@@ -2837,7 +2837,7 @@ class DeckArc(BaseDeckGLViz):
         }
 
 
-class EventFlowViz(BaseViz):
+# class EventFlowViz(BaseViz):
     """A visualization to explore patterns in event sequences"""
 
     viz_type = 'event_flow'
