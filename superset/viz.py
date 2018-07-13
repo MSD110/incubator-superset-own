@@ -2867,7 +2867,7 @@ class EventFlowViz(BaseViz):
         return df.to_dict(orient='records')
 
 
-class PairedTTestViz(BaseViz):
+# class PairedTTestViz(BaseViz):
     """A table displaying paired t-test values"""
 
     viz_type = 'paired_ttest'
