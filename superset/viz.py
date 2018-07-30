@@ -2951,7 +2951,7 @@ class RoseViz(NVD3TimeSeriesViz):
         return result
 
 
-# class PartitionViz(NVD3TimeSeriesViz):
+class PartitionViz(NVD3TimeSeriesViz):
     """
     A hierarchical data visualization with support for time series.
     """
