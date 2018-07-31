@@ -3086,7 +3086,7 @@ class PartitionViz(NVD3TimeSeriesViz):
         return self.nest_values(levels)
 
 
-viz_types = {
+# viz_types = {
     o.viz_type: o for o in globals().values()
     if (
     inspect.isclass(o) and
