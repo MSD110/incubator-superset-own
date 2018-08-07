@@ -70,7 +70,7 @@ global_flag = False
 global_query = {}
 
 
-class BaseViz(object):
+# class BaseViz(object):
 
     """All visualizations derive this base class"""
 
