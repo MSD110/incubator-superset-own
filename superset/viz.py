@@ -35,7 +35,7 @@ import traceback
 import uuid
 
 from dateutil import relativedelta as rdelta
-from flask import request
+# from flask import request
 from flask_babel import lazy_gettext as _
 import geohash
 from geopy.point import Point
