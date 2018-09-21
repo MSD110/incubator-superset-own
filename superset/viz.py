@@ -34,17 +34,17 @@ import re
 import traceback
 import uuid
 
-from dateutil import relativedelta as rdelta
-from flask import request
-from flask_babel import lazy_gettext as _
-import geohash
-from geopy.point import Point
-from markdown import markdown
-import numpy as np
-import pandas as pd
-from pandas.tseries.frequencies import to_offset
-import polyline
-import simplejson as json
+# from dateutil import relativedelta as rdelta
+# from flask import request
+# from flask_babel import lazy_gettext as _
+# import geohash
+# from geopy.point import Point
+# from markdown import markdown
+# import numpy as np
+# import pandas as pd
+# from pandas.tseries.frequencies import to_offset
+# import polyline
+# import simplejson as json
 
 from superset import app, cache, get_css_manifest_files
 from superset.exceptions import NullValueException, SpatialException
