@@ -46,15 +46,15 @@ from pandas.tseries.frequencies import to_offset
 import polyline
 import simplejson as json
 
-from superset import app, cache, get_css_manifest_files
-from superset.exceptions import NullValueException, SpatialException
-from superset.utils import core as utils
-from superset.utils.core import (
-    DTTM_ALIAS,
-    JS_MAX_INTEGER,
-    merge_extra_filters,
-    to_adhoc,
-)
+# from superset import app, cache, get_css_manifest_files
+# from superset.exceptions import NullValueException, SpatialException
+# from superset.utils import core as utils
+# from superset.utils.core import (
+#     DTTM_ALIAS,
+#     JS_MAX_INTEGER,
+#     merge_extra_filters,
+#     to_adhoc,
+# )
 
 config = app.config
 stats_logger = config.get('STATS_LOGGER')
