@@ -56,18 +56,18 @@ from superset.utils.core import (
     to_adhoc,
 )
 
-config = app.config
-stats_logger = config.get('STATS_LOGGER')
-relative_end = config.get('DEFAULT_RELATIVE_END_TIME', 'today')
-
-METRIC_KEYS = [
-    'metric', 'metrics', 'percent_metrics', 'metric_2', 'secondary_metric',
-    'x', 'y', 'size',
-]
-
-global_dd = []
-global_flag = False
-global_query = {}
+# config = app.config
+# stats_logger = config.get('STATS_LOGGER')
+# relative_end = config.get('DEFAULT_RELATIVE_END_TIME', 'today')
+#
+# METRIC_KEYS = [
+#     'metric', 'metrics', 'percent_metrics', 'metric_2', 'secondary_metric',
+#     'x', 'y', 'size',
+# ]
+#
+# global_dd = []
+# global_flag = False
+# global_query = {}
 
 
 class BaseViz(object):
