@@ -574,150 +574,150 @@ class BaseViz(object):
         return json.dumps(self.data)
 
 
-# class FunnelViz(BaseViz):
-#     """A multi filter, multi-choice filter box to make dashboards interactive"""
-#
-#     viz_type = 'funnel'
-#     verbose_name = _('Funnel')
-#     is_timeseries = False
-#     credits = 'a <a href="https://github.com/airbnb/superset">Superset</a> original'
-#     cache_type = 'get_data'
-#     filter_row_limit = 1000
-#
-#     def query_obj(self, get_query=False):
-#
-#         fd = self.form_data
-#
-#         if not fd.get('funnel_steps'):
-#             raise Exception(_('Add at least one Step'))
-#
-#         logging.debug("________funnel_form_data_____________\n%s", fd)
-#
-#         if isinstance(fd.get('funnel_steps'), list):
-#             raise Exception(_('No selected values'))
-#
-#         sel_values = fd['funnel_steps']['selectedValues']
-#
-#         step_count = len(fd['funnel_steps']['queries'])
-#
-#         filter_store = []
-#         if fd.get('filters'):
-#             filter_store = fd['filters']
-#         if filter_store:
-#             logging.debug("______filters____\n%s", filter_store)
-#
-#         global global_query
-#         global_query = {}
-#         for i in range(0, step_count):
-#             index = str(fd['funnel_steps']['queries'][i]['id'])
-#             # logging.debug("_______index_______\n%s",index)
-#             fd['metrics'] = []
-#             fd['adhoc_filters'] = []
-#             # fd['filters'] = []
-#
-#             fd['metrics'].append(sel_values[index]['metric'])
-#             if sel_values[index].get('adhoc_filters'):
-#                 fd['adhoc_filters'] = sel_values[index]['adhoc_filters']
-#
-#             qry = super(FunnelViz, self).query_obj()
-#
-#             if filter_store:
-#                 for filter in filter_store:
-#                     qry['filter'].append(filter)
-#
-#             global_query[str(i)] = qry
-#
-#         # logging.debug("________funnel_form_data_____________\n%s", self.form_data)
-#
-#         # d = super(FunnelViz, self).query_obj()
-#
-#         # logging.debug("_________funnel_query_obj_____________\n%s", d)
-#         logging.debug("_________query_obj_global_query_______\n%s", global_query)
-#         #
-#         # if get_query:
-#         return global_query
-#         # else:
-#         # return d
-#
-#     def get_data(self, df):
-#
-#         fd = self.form_data
-#
-#         if not fd.get('funnel_steps'):
-#             raise Exception(_('Add at least one Step'))
-#
-#         if isinstance(fd.get('funnel_steps'), list):
-#             raise Exception(_('No selected values'))
-#
-#         sel_values = fd['funnel_steps']['selectedValues']
-#         step_count = len(fd['funnel_steps']['queries'])
-#
-#         ddd = {}
-#         d = []
-#
-#         logging.debug("_get_data__form_data_\n%s", fd)
-#
-#         if step_count == 0:
-#             raise Exception(_('Add at least one Step'))
-#
-#         filter_store = []
-#         if fd['filters']:
-#             filter_store = fd['filters']
-#         if filter_store:
-#             logging.debug("______filters____\n%s", filter_store)
-#
-#         for i in range(0, step_count):
-#             index = str(fd['funnel_steps']['queries'][i]['id'])
-#             # logging.debug("_get_data__data_index_\n%s",index)
-#             fd['metrics'] = []
-#             fd['adhoc_filters'] = []
-#             #fd['filters'] = []
-#             if sel_values[index]['metric']==[]:
-#                 raise Exception(_('Must add metric on each step'))
-#             fd['metrics'].append(sel_values[index]['metric'])
-#             if sel_values[index].get('adhoc_filters'):
-#                 fd['adhoc_filters'] = sel_values[index]['adhoc_filters']
-#
-#             logging.debug("_get_data_fd_\n%s", fd)
-#
-#             qry = super(FunnelViz, self).query_obj()
-#
-#             if filter_store:
-#                 for filter in filter_store:
-#                     qry['filter'].append(filter)
-#
-#             logging.debug("_________Query__%d______\n%s",i, qry)
-#
-#             dfd = self.get_df_payload(query_obj=qry).get('df')
-#
-#             # logging.debug("_________DFF________\n%s", dfd)
-#
-#             dd = dfd.to_dict(orient='records')
-#
-#             for key in dd[0]:
-#                 logging.debug("______dd_0_____\n%s", dd[0])
-#                 d_key = key
-#                 i = 1
-#                 if key in ddd.keys():
-#                     while True:
-#                         if not key + "_" + str(i) in ddd.keys(): break
-#                         else: i += 1
-#                     d_key += ("_" + str(i))
-#                 ddd[d_key] = dd[0][key]
-#
-#         logging.debug("__data__\n%s", ddd)
-#         d.append(ddd)
-#
-#         global global_dd
-#         global global_flag
-#
-#         global_dd = d
-#         global_flag = True
-#
-#         # logging.debug("_____global_dd________", global_dd)
-#         logging.debug("___________get_data__________\n%s",d)
-#
-#         return d
+class FunnelViz(BaseViz):
+    """A multi filter, multi-choice filter box to make dashboards interactive"""
+
+    viz_type = 'funnel'
+    verbose_name = _('Funnel')
+    is_timeseries = False
+    credits = 'a <a href="https://github.com/airbnb/superset">Superset</a> original'
+    cache_type = 'get_data'
+    filter_row_limit = 1000
+
+    def query_obj(self, get_query=False):
+
+        fd = self.form_data
+
+        if not fd.get('funnel_steps'):
+            raise Exception(_('Add at least one Step'))
+
+        logging.debug("________funnel_form_data_____________\n%s", fd)
+
+        if isinstance(fd.get('funnel_steps'), list):
+            raise Exception(_('No selected values'))
+
+        sel_values = fd['funnel_steps']['selectedValues']
+
+        step_count = len(fd['funnel_steps']['queries'])
+
+        filter_store = []
+        if fd.get('filters'):
+            filter_store = fd['filters']
+        if filter_store:
+            logging.debug("______filters____\n%s", filter_store)
+
+        global global_query
+        global_query = {}
+        for i in range(0, step_count):
+            index = str(fd['funnel_steps']['queries'][i]['id'])
+            # logging.debug("_______index_______\n%s",index)
+            fd['metrics'] = []
+            fd['adhoc_filters'] = []
+            # fd['filters'] = []
+
+            fd['metrics'].append(sel_values[index]['metric'])
+            if sel_values[index].get('adhoc_filters'):
+                fd['adhoc_filters'] = sel_values[index]['adhoc_filters']
+
+            qry = super(FunnelViz, self).query_obj()
+
+            if filter_store:
+                for filter in filter_store:
+                    qry['filter'].append(filter)
+
+            global_query[str(i)] = qry
+
+        # logging.debug("________funnel_form_data_____________\n%s", self.form_data)
+
+        # d = super(FunnelViz, self).query_obj()
+
+        # logging.debug("_________funnel_query_obj_____________\n%s", d)
+        logging.debug("_________query_obj_global_query_______\n%s", global_query)
+        #
+        # if get_query:
+        return global_query
+        # else:
+        # return d
+
+    def get_data(self, df):
+
+        fd = self.form_data
+
+        if not fd.get('funnel_steps'):
+            raise Exception(_('Add at least one Step'))
+
+        if isinstance(fd.get('funnel_steps'), list):
+            raise Exception(_('No selected values'))
+
+        sel_values = fd['funnel_steps']['selectedValues']
+        step_count = len(fd['funnel_steps']['queries'])
+
+        ddd = {}
+        d = []
+
+        logging.debug("_get_data__form_data_\n%s", fd)
+
+        if step_count == 0:
+            raise Exception(_('Add at least one Step'))
+
+        filter_store = []
+        if fd['filters']:
+            filter_store = fd['filters']
+        if filter_store:
+            logging.debug("______filters____\n%s", filter_store)
+
+        for i in range(0, step_count):
+            index = str(fd['funnel_steps']['queries'][i]['id'])
+            # logging.debug("_get_data__data_index_\n%s",index)
+            fd['metrics'] = []
+            fd['adhoc_filters'] = []
+            #fd['filters'] = []
+            if sel_values[index]['metric']==[]:
+                raise Exception(_('Must add metric on each step'))
+            fd['metrics'].append(sel_values[index]['metric'])
+            if sel_values[index].get('adhoc_filters'):
+                fd['adhoc_filters'] = sel_values[index]['adhoc_filters']
+
+            logging.debug("_get_data_fd_\n%s", fd)
+
+            qry = super(FunnelViz, self).query_obj()
+
+            if filter_store:
+                for filter in filter_store:
+                    qry['filter'].append(filter)
+
+            logging.debug("_________Query__%d______\n%s",i, qry)
+
+            dfd = self.get_df_payload(query_obj=qry).get('df')
+
+            # logging.debug("_________DFF________\n%s", dfd)
+
+            dd = dfd.to_dict(orient='records')
+
+            for key in dd[0]:
+                logging.debug("______dd_0_____\n%s", dd[0])
+                d_key = key
+                i = 1
+                if key in ddd.keys():
+                    while True:
+                        if not key + "_" + str(i) in ddd.keys(): break
+                        else: i += 1
+                    d_key += ("_" + str(i))
+                ddd[d_key] = dd[0][key]
+
+        logging.debug("__data__\n%s", ddd)
+        d.append(ddd)
+
+        global global_dd
+        global global_flag
+
+        global_dd = d
+        global_flag = True
+
+        # logging.debug("_____global_dd________", global_dd)
+        logging.debug("___________get_data__________\n%s",d)
+
+        return d
 
 
 class TableDrillDownViz(BaseViz):
