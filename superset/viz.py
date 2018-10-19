@@ -880,7 +880,7 @@ class TableDrillDownViz(BaseViz):
             ignore_nan=True)
 
 
-# class TableViz(BaseViz):
+class TableViz(BaseViz):
     """A basic html table that is sortable and searchable"""
 
     viz_type = 'table'
