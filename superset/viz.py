@@ -984,7 +984,7 @@ class TableViz(BaseViz):
             ignore_nan=True)
 
 
-class TimeTableViz(BaseViz):
+# class TimeTableViz(BaseViz):
     """A data table with rich time-series related columns"""
 
     viz_type = 'time_table'
