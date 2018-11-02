@@ -1024,7 +1024,7 @@ class TimeTableViz(BaseViz):
         )
 
 
-# class PivotTableViz(BaseViz):
+class PivotTableViz(BaseViz):
     """A pivot table view, define your rows, columns and metrics"""
 
     viz_type = 'pivot_table'
