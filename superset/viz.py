@@ -1076,7 +1076,7 @@ class PivotTableViz(BaseViz):
         )
 
 
-class MarkupViz(BaseViz):
+# class MarkupViz(BaseViz):
     """Use html or markdown to create a free form widget"""
 
     viz_type = 'markup'
