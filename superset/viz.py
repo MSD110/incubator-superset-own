@@ -1097,7 +1097,7 @@ class MarkupViz(BaseViz):
         return dict(html=code, theme_css=get_css_manifest_files('theme'))
 
 
-# class SeparatorViz(MarkupViz):
+class SeparatorViz(MarkupViz):
     """Use to create section headers in a dashboard, similar to `Markup`"""
 
     viz_type = 'separator'
