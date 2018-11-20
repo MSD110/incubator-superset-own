@@ -1121,7 +1121,7 @@ class WordCloudViz(BaseViz):
         return d
 
 
-class TreemapViz(BaseViz):
+# class TreemapViz(BaseViz):
     """Tree map visualisation for hierarchical data."""
 
     viz_type = 'treemap'
