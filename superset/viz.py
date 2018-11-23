@@ -1146,7 +1146,7 @@ class TreemapViz(BaseViz):
         return chart_data
 
 
-class CalHeatmapViz(BaseViz):
+# class CalHeatmapViz(BaseViz):
     """Calendar heatmap."""
 
     viz_type = 'cal_heatmap'
