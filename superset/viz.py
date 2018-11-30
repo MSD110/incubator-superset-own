@@ -1205,7 +1205,7 @@ class CalHeatmapViz(BaseViz):
         return d
 
 
-# class NVD3Viz(BaseViz):
+class NVD3Viz(BaseViz):
     """Base class for all nvd3 vizs"""
 
     credits = '<a href="http://nvd3.org/">NVD3.org</a>'
