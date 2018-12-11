@@ -1351,7 +1351,7 @@ class BubbleViz(NVD3Viz):
         return chart_data
 
 
-class BulletViz(NVD3Viz):
+# class BulletViz(NVD3Viz):
     """Based on the NVD3 bullet chart"""
 
     viz_type = 'bullet'
