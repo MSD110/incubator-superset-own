@@ -641,65 +641,65 @@ class TimeTableViz(BaseViz):
         )
 
 
-class PivotTableViz(BaseViz):
-
-    """A pivot table view, define your rows, columns and metrics"""
-
-    viz_type = 'pivot_table'
-    verbose_name = _('Pivot Table')
-    credits = 'a <a href="https://github.com/airbnb/superset">Superset</a> original'
-    is_timeseries = False
-
-    def query_obj(self):
-        d = super().query_obj()
-        groupby = self.form_data.get('groupby')
-        columns = self.form_data.get('columns')
-        metrics = self.form_data.get('metrics')
-        if not columns:
-            columns = []
-        if not groupby:
-            groupby = []
-        if not groupby:
-            raise Exception(_("Please choose at least one 'Group by' field "))
-        if not metrics:
-            raise Exception(_('Please choose at least one metric'))
-        if (
-                any(v in groupby for v in columns) or
-                any(v in columns for v in groupby)):
-            raise Exception(_("Group By' and 'Columns' can't overlap"))
-        return d
-
-    def get_data(self, df):
-        if (
-                self.form_data.get('granularity') == 'all' and
-                DTTM_ALIAS in df):
-            del df[DTTM_ALIAS]
-
-        aggfunc = self.form_data.get('pandas_aggfunc')
-
-        # Ensure that Pandas's sum function mimics that of SQL.
-        if aggfunc == 'sum':
-            aggfunc = lambda x: x.sum(min_count=1)  # noqa: E731
-
-        df = df.pivot_table(
-            index=self.form_data.get('groupby'),
-            columns=self.form_data.get('columns'),
-            values=[utils.get_metric_name(m) for m in self.form_data.get('metrics')],
-            aggfunc=aggfunc,
-            margins=self.form_data.get('pivot_margins'),
-            dropna=False,
-        )
-        # Display metrics side by side with each column
-        if self.form_data.get('combine_metric'):
-            df = df.stack(0).unstack()
-        return dict(
-            columns=list(df.columns),
-            html=df.to_html(
-                na_rep='null',
-                classes=(
-                    'dataframe table table-striped table-bordered '
-                    'table-condensed table-hover').split(' ')),
-        )
+# class PivotTableViz(BaseViz):
+#
+#     """A pivot table view, define your rows, columns and metrics"""
+#
+#     viz_type = 'pivot_table'
+#     verbose_name = _('Pivot Table')
+#     credits = 'a <a href="https://github.com/airbnb/superset">Superset</a> original'
+#     is_timeseries = False
+#
+#     def query_obj(self):
+#         d = super().query_obj()
+#         groupby = self.form_data.get('groupby')
+#         columns = self.form_data.get('columns')
+#         metrics = self.form_data.get('metrics')
+#         if not columns:
+#             columns = []
+#         if not groupby:
+#             groupby = []
+#         if not groupby:
+#             raise Exception(_("Please choose at least one 'Group by' field "))
+#         if not metrics:
+#             raise Exception(_('Please choose at least one metric'))
+#         if (
+#                 any(v in groupby for v in columns) or
+#                 any(v in columns for v in groupby)):
+#             raise Exception(_("Group By' and 'Columns' can't overlap"))
+#         return d
+#
+#     def get_data(self, df):
+#         if (
+#                 self.form_data.get('granularity') == 'all' and
+#                 DTTM_ALIAS in df):
+#             del df[DTTM_ALIAS]
+#
+#         aggfunc = self.form_data.get('pandas_aggfunc')
+#
+#         # Ensure that Pandas's sum function mimics that of SQL.
+#         if aggfunc == 'sum':
+#             aggfunc = lambda x: x.sum(min_count=1)  # noqa: E731
+#
+#         df = df.pivot_table(
+#             index=self.form_data.get('groupby'),
+#             columns=self.form_data.get('columns'),
+#             values=[utils.get_metric_name(m) for m in self.form_data.get('metrics')],
+#             aggfunc=aggfunc,
+#             margins=self.form_data.get('pivot_margins'),
+#             dropna=False,
+#         )
+#         # Display metrics side by side with each column
+#         if self.form_data.get('combine_metric'):
+#             df = df.stack(0).unstack()
+#         return dict(
+#             columns=list(df.columns),
+#             html=df.to_html(
+#                 na_rep='null',
+#                 classes=(
+#                     'dataframe table table-striped table-bordered '
+#                     'table-condensed table-hover').split(' ')),
+#         )
 
 
 class MarkupViz(BaseViz):
