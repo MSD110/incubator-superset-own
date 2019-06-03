@@ -702,148 +702,148 @@ class PivotTableViz(BaseViz):
         )
 
 
-class MarkupViz(BaseViz):
-
-    """Use html or markdown to create a free form widget"""
-
-    viz_type = 'markup'
-    verbose_name = _('Markup')
-    is_timeseries = False
-
-    def query_obj(self):
-        return None
-
-    def get_df(self, query_obj=None):
-        return None
-
-    def get_data(self, df):
-        markup_type = self.form_data.get('markup_type')
-        code = self.form_data.get('code', '')
-        if markup_type == 'markdown':
-            code = markdown(code)
-        return dict(html=code, theme_css=get_css_manifest_files('theme'))
-
-
-class SeparatorViz(MarkupViz):
-
-    """Use to create section headers in a dashboard, similar to `Markup`"""
-
-    viz_type = 'separator'
-    verbose_name = _('Separator')
-
-
-class WordCloudViz(BaseViz):
-
-    """Build a colorful word cloud
-
-    Uses the nice library at:
-    https://github.com/jasondavies/d3-cloud
-    """
-
-    viz_type = 'word_cloud'
-    verbose_name = _('Word Cloud')
-    is_timeseries = False
-
-    def query_obj(self):
-        d = super().query_obj()
-        d['groupby'] = [self.form_data.get('series')]
-        return d
-
-
-class TreemapViz(BaseViz):
-
-    """Tree map visualisation for hierarchical data."""
-
-    viz_type = 'treemap'
-    verbose_name = _('Treemap')
-    credits = '<a href="https://d3js.org">d3.js</a>'
-    is_timeseries = False
-
-    def _nest(self, metric, df):
-        nlevels = df.index.nlevels
-        if nlevels == 1:
-            result = [{'name': n, 'value': v}
-                      for n, v in zip(df.index, df[metric])]
-        else:
-            result = [{'name': l, 'children': self._nest(metric, df.loc[l])}
-                      for l in df.index.levels[0]]
-        return result
-
-    def get_data(self, df):
-        df = df.set_index(self.form_data.get('groupby'))
-        chart_data = [{'name': metric, 'children': self._nest(metric, df)}
-                      for metric in df.columns]
-        return chart_data
-
-
-class CalHeatmapViz(BaseViz):
-
-    """Calendar heatmap."""
-
-    viz_type = 'cal_heatmap'
-    verbose_name = _('Calendar Heatmap')
-    credits = (
-        '<a href=https://github.com/wa0x6e/cal-heatmap>cal-heatmap</a>')
-    is_timeseries = True
-
-    def get_data(self, df):
-        form_data = self.form_data
-
-        data = {}
-        records = df.to_dict('records')
-        for metric in self.metric_labels:
-            values = {}
-            for obj in records:
-                v = obj[DTTM_ALIAS]
-                if hasattr(v, 'value'):
-                    v = v.value
-                values[str(v / 10**9)] = obj.get(metric)
-            data[metric] = values
-
-        start, end = utils.get_since_until(relative_end=relative_end,
-                                           time_range=form_data.get('time_range'),
-                                           since=form_data.get('since'),
-                                           until=form_data.get('until'))
-        if not start or not end:
-            raise Exception('Please provide both time bounds (Since and Until)')
-        domain = form_data.get('domain_granularity')
-        diff_delta = rdelta.relativedelta(end, start)
-        diff_secs = (end - start).total_seconds()
-
-        if domain == 'year':
-            range_ = diff_delta.years + 1
-        elif domain == 'month':
-            range_ = diff_delta.years * 12 + diff_delta.months + 1
-        elif domain == 'week':
-            range_ = diff_delta.years * 53 + diff_delta.weeks + 1
-        elif domain == 'day':
-            range_ = diff_secs // (24 * 60 * 60) + 1
-        else:
-            range_ = diff_secs // (60 * 60) + 1
-
-        return {
-            'data': data,
-            'start': start,
-            'domain': domain,
-            'subdomain': form_data.get('subdomain_granularity'),
-            'range': range_,
-        }
-
-    def query_obj(self):
-        d = super().query_obj()
-        fd = self.form_data
-        d['metrics'] = fd.get('metrics')
-        return d
-
-
-class NVD3Viz(BaseViz):
-
-    """Base class for all nvd3 vizs"""
-
-    credits = '<a href="http://nvd3.org/">NVD3.org</a>'
-    viz_type = None
-    verbose_name = 'Base NVD3 Viz'
-    is_timeseries = False
+# class MarkupViz(BaseViz):
+#
+#     """Use html or markdown to create a free form widget"""
+#
+#     viz_type = 'markup'
+#     verbose_name = _('Markup')
+#     is_timeseries = False
+#
+#     def query_obj(self):
+#         return None
+#
+#     def get_df(self, query_obj=None):
+#         return None
+#
+#     def get_data(self, df):
+#         markup_type = self.form_data.get('markup_type')
+#         code = self.form_data.get('code', '')
+#         if markup_type == 'markdown':
+#             code = markdown(code)
+#         return dict(html=code, theme_css=get_css_manifest_files('theme'))
+#
+#
+# class SeparatorViz(MarkupViz):
+#
+#     """Use to create section headers in a dashboard, similar to `Markup`"""
+#
+#     viz_type = 'separator'
+#     verbose_name = _('Separator')
+#
+#
+# class WordCloudViz(BaseViz):
+#
+#     """Build a colorful word cloud
+#
+#     Uses the nice library at:
+#     https://github.com/jasondavies/d3-cloud
+#     """
+#
+#     viz_type = 'word_cloud'
+#     verbose_name = _('Word Cloud')
+#     is_timeseries = False
+#
+#     def query_obj(self):
+#         d = super().query_obj()
+#         d['groupby'] = [self.form_data.get('series')]
+#         return d
+#
+#
+# class TreemapViz(BaseViz):
+#
+#     """Tree map visualisation for hierarchical data."""
+#
+#     viz_type = 'treemap'
+#     verbose_name = _('Treemap')
+#     credits = '<a href="https://d3js.org">d3.js</a>'
+#     is_timeseries = False
+#
+#     def _nest(self, metric, df):
+#         nlevels = df.index.nlevels
+#         if nlevels == 1:
+#             result = [{'name': n, 'value': v}
+#                       for n, v in zip(df.index, df[metric])]
+#         else:
+#             result = [{'name': l, 'children': self._nest(metric, df.loc[l])}
+#                       for l in df.index.levels[0]]
+#         return result
+#
+#     def get_data(self, df):
+#         df = df.set_index(self.form_data.get('groupby'))
+#         chart_data = [{'name': metric, 'children': self._nest(metric, df)}
+#                       for metric in df.columns]
+#         return chart_data
+#
+#
+# class CalHeatmapViz(BaseViz):
+#
+#     """Calendar heatmap."""
+#
+#     viz_type = 'cal_heatmap'
+#     verbose_name = _('Calendar Heatmap')
+#     credits = (
+#         '<a href=https://github.com/wa0x6e/cal-heatmap>cal-heatmap</a>')
+#     is_timeseries = True
+#
+#     def get_data(self, df):
+#         form_data = self.form_data
+#
+#         data = {}
+#         records = df.to_dict('records')
+#         for metric in self.metric_labels:
+#             values = {}
+#             for obj in records:
+#                 v = obj[DTTM_ALIAS]
+#                 if hasattr(v, 'value'):
+#                     v = v.value
+#                 values[str(v / 10**9)] = obj.get(metric)
+#             data[metric] = values
+#
+#         start, end = utils.get_since_until(relative_end=relative_end,
+#                                            time_range=form_data.get('time_range'),
+#                                            since=form_data.get('since'),
+#                                            until=form_data.get('until'))
+#         if not start or not end:
+#             raise Exception('Please provide both time bounds (Since and Until)')
+#         domain = form_data.get('domain_granularity')
+#         diff_delta = rdelta.relativedelta(end, start)
+#         diff_secs = (end - start).total_seconds()
+#
+#         if domain == 'year':
+#             range_ = diff_delta.years + 1
+#         elif domain == 'month':
+#             range_ = diff_delta.years * 12 + diff_delta.months + 1
+#         elif domain == 'week':
+#             range_ = diff_delta.years * 53 + diff_delta.weeks + 1
+#         elif domain == 'day':
+#             range_ = diff_secs // (24 * 60 * 60) + 1
+#         else:
+#             range_ = diff_secs // (60 * 60) + 1
+#
+#         return {
+#             'data': data,
+#             'start': start,
+#             'domain': domain,
+#             'subdomain': form_data.get('subdomain_granularity'),
+#             'range': range_,
+#         }
+#
+#     def query_obj(self):
+#         d = super().query_obj()
+#         fd = self.form_data
+#         d['metrics'] = fd.get('metrics')
+#         return d
+#
+#
+# class NVD3Viz(BaseViz):
+#
+#     """Base class for all nvd3 vizs"""
+#
+#     credits = '<a href="http://nvd3.org/">NVD3.org</a>'
+#     viz_type = None
+#     verbose_name = 'Base NVD3 Viz'
+#     is_timeseries = False
 
 
 class BoxPlotViz(NVD3Viz):
