@@ -846,426 +846,426 @@ class NVD3Viz(BaseViz):
     is_timeseries = False
 
 
-class BoxPlotViz(NVD3Viz):
-
-    """Box plot viz from ND3"""
-
-    viz_type = 'box_plot'
-    verbose_name = _('Box Plot')
-    sort_series = False
-    is_timeseries = True
-
-    def to_series(self, df, classed='', title_suffix=''):
-        label_sep = ' - '
-        chart_data = []
-        for index_value, row in zip(df.index, df.to_dict(orient='records')):
-            if isinstance(index_value, tuple):
-                index_value = label_sep.join(index_value)
-            boxes = defaultdict(dict)
-            for (label, key), value in row.items():
-                if key == 'nanmedian':
-                    key = 'Q2'
-                boxes[label][key] = value
-            for label, box in boxes.items():
-                if len(self.form_data.get('metrics')) > 1:
-                    # need to render data labels with metrics
-                    chart_label = label_sep.join([index_value, label])
-                else:
-                    chart_label = index_value
-                chart_data.append({
-                    'label': chart_label,
-                    'values': box,
-                })
-        return chart_data
-
-    def get_data(self, df):
-        form_data = self.form_data
-
-        # conform to NVD3 names
-        def Q1(series):  # need to be named functions - can't use lambdas
-            return np.nanpercentile(series, 25)
-
-        def Q3(series):
-            return np.nanpercentile(series, 75)
-
-        whisker_type = form_data.get('whisker_options')
-        if whisker_type == 'Tukey':
-
-            def whisker_high(series):
-                upper_outer_lim = Q3(series) + 1.5 * (Q3(series) - Q1(series))
-                return series[series <= upper_outer_lim].max()
-
-            def whisker_low(series):
-                lower_outer_lim = Q1(series) - 1.5 * (Q3(series) - Q1(series))
-                return series[series >= lower_outer_lim].min()
-
-        elif whisker_type == 'Min/max (no outliers)':
-
-            def whisker_high(series):
-                return series.max()
-
-            def whisker_low(series):
-                return series.min()
-
-        elif ' percentiles' in whisker_type:
-            low, high = whisker_type.replace(' percentiles', '').split('/')
-
-            def whisker_high(series):
-                return np.nanpercentile(series, int(high))
-
-            def whisker_low(series):
-                return np.nanpercentile(series, int(low))
-
-        else:
-            raise ValueError('Unknown whisker type: {}'.format(whisker_type))
-
-        def outliers(series):
-            above = series[series > whisker_high(series)]
-            below = series[series < whisker_low(series)]
-            # pandas sometimes doesn't like getting lists back here
-            return set(above.tolist() + below.tolist())
-
-        aggregate = [Q1, np.nanmedian, Q3, whisker_high, whisker_low, outliers]
-        df = df.groupby(form_data.get('groupby')).agg(aggregate)
-        chart_data = self.to_series(df)
-        return chart_data
-
-
-class BubbleViz(NVD3Viz):
-
-    """Based on the NVD3 bubble chart"""
-
-    viz_type = 'bubble'
-    verbose_name = _('Bubble Chart')
-    is_timeseries = False
-
-    def query_obj(self):
-        form_data = self.form_data
-        d = super().query_obj()
-        d['groupby'] = [
-            form_data.get('entity'),
-        ]
-        if form_data.get('series'):
-            d['groupby'].append(form_data.get('series'))
-        self.x_metric = form_data.get('x')
-        self.y_metric = form_data.get('y')
-        self.z_metric = form_data.get('size')
-        self.entity = form_data.get('entity')
-        self.series = form_data.get('series') or self.entity
-        d['row_limit'] = form_data.get('limit')
-
-        d['metrics'] = list(set([
-            self.z_metric,
-            self.x_metric,
-            self.y_metric,
-        ]))
-        if not all(d['metrics'] + [self.entity]):
-            raise Exception(_('Pick a metric for x, y and size'))
-        return d
-
-    def get_data(self, df):
-        df['x'] = df[[utils.get_metric_name(self.x_metric)]]
-        df['y'] = df[[utils.get_metric_name(self.y_metric)]]
-        df['size'] = df[[utils.get_metric_name(self.z_metric)]]
-        df['shape'] = 'circle'
-        df['group'] = df[[self.series]]
-
-        series = defaultdict(list)
-        for row in df.to_dict(orient='records'):
-            series[row['group']].append(row)
-        chart_data = []
-        for k, v in series.items():
-            chart_data.append({
-                'key': k,
-                'values': v})
-        return chart_data
-
-
-class BulletViz(NVD3Viz):
-
-    """Based on the NVD3 bullet chart"""
-
-    viz_type = 'bullet'
-    verbose_name = _('Bullet Chart')
-    is_timeseries = False
-
-    def query_obj(self):
-        form_data = self.form_data
-        d = super().query_obj()
-        self.metric = form_data.get('metric')
-
-        def as_strings(field):
-            value = form_data.get(field)
-            return value.split(',') if value else []
-
-        def as_floats(field):
-            return [float(x) for x in as_strings(field)]
-
-        self.ranges = as_floats('ranges')
-        self.range_labels = as_strings('range_labels')
-        self.markers = as_floats('markers')
-        self.marker_labels = as_strings('marker_labels')
-        self.marker_lines = as_floats('marker_lines')
-        self.marker_line_labels = as_strings('marker_line_labels')
-
-        d['metrics'] = [
-            self.metric,
-        ]
-        if not self.metric:
-            raise Exception(_('Pick a metric to display'))
-        return d
-
-    def get_data(self, df):
-        df['metric'] = df[[utils.get_metric_name(self.metric)]]
-        values = df['metric'].values
-        return {
-            'measures': values.tolist(),
-            'ranges': self.ranges or [0, values.max() * 1.1],
-            'rangeLabels': self.range_labels or None,
-            'markers': self.markers or None,
-            'markerLabels': self.marker_labels or None,
-            'markerLines': self.marker_lines or None,
-            'markerLineLabels': self.marker_line_labels or None,
-        }
-
-
-class BigNumberViz(BaseViz):
-
-    """Put emphasis on a single metric with this big number viz"""
-
-    viz_type = 'big_number'
-    verbose_name = _('Big Number with Trendline')
-    credits = 'a <a href="https://github.com/airbnb/superset">Superset</a> original'
-    is_timeseries = True
-
-    def query_obj(self):
-        d = super().query_obj()
-        metric = self.form_data.get('metric')
-        if not metric:
-            raise Exception(_('Pick a metric!'))
-        d['metrics'] = [self.form_data.get('metric')]
-        self.form_data['metric'] = metric
-        return d
-
-
-class BigNumberTotalViz(BaseViz):
-
-    """Put emphasis on a single metric with this big number viz"""
-
-    viz_type = 'big_number_total'
-    verbose_name = _('Big Number')
-    credits = 'a <a href="https://github.com/airbnb/superset">Superset</a> original'
-    is_timeseries = False
-
-    def query_obj(self):
-        d = super().query_obj()
-        metric = self.form_data.get('metric')
-        if not metric:
-            raise Exception(_('Pick a metric!'))
-        d['metrics'] = [self.form_data.get('metric')]
-        self.form_data['metric'] = metric
-        return d
-
-
-class NVD3TimeSeriesViz(NVD3Viz):
-
-    """A rich line chart component with tons of options"""
-
-    viz_type = 'line'
-    verbose_name = _('Time Series - Line Chart')
-    sort_series = False
-    is_timeseries = True
-
-    def to_series(self, df, classed='', title_suffix=''):
-        cols = []
-        for col in df.columns:
-            if col == '':
-                cols.append('N/A')
-            elif col is None:
-                cols.append('NULL')
-            else:
-                cols.append(col)
-        df.columns = cols
-        series = df.to_dict('series')
-
-        chart_data = []
-        for name in df.T.index.tolist():
-            ys = series[name]
-            if df[name].dtype.kind not in 'biufc':
-                continue
-            if isinstance(name, list):
-                series_title = [str(title) for title in name]
-            elif isinstance(name, tuple):
-                series_title = tuple(str(title) for title in name)
-            else:
-                series_title = str(name)
-            if (
-                    isinstance(series_title, (list, tuple)) and
-                    len(series_title) > 1 and
-                    len(self.metric_labels) == 1):
-                # Removing metric from series name if only one metric
-                series_title = series_title[1:]
-            if title_suffix:
-                if isinstance(series_title, str):
-                    series_title = (series_title, title_suffix)
-                elif isinstance(series_title, (list, tuple)):
-                    series_title = series_title + (title_suffix,)
-
-            values = []
-            non_nan_cnt = 0
-            for ds in df.index:
-                if ds in ys:
-                    d = {
-                        'x': ds,
-                        'y': ys[ds],
-                    }
-                    if not np.isnan(ys[ds]):
-                        non_nan_cnt += 1
-                else:
-                    d = {}
-                values.append(d)
-
-            if non_nan_cnt == 0:
-                continue
-
-            d = {
-                'key': series_title,
-                'values': values,
-            }
-            if classed:
-                d['classed'] = classed
-            chart_data.append(d)
-        return chart_data
-
-    def process_data(self, df, aggregate=False):
-        fd = self.form_data
-        if fd.get('granularity') == 'all':
-            raise Exception(_('Pick a time granularity for your time series'))
-
-        if not aggregate:
-            df = df.pivot_table(
-                index=DTTM_ALIAS,
-                columns=fd.get('groupby'),
-                values=self.metric_labels,
-                dropna=False,
-            )
-        else:
-            df = df.pivot_table(
-                index=DTTM_ALIAS,
-                columns=fd.get('groupby'),
-                values=self.metric_labels,
-                fill_value=0,
-                aggfunc=sum,
-                dropna=False,
-            )
-
-        fm = fd.get('resample_fillmethod')
-        if not fm:
-            fm = None
-        how = fd.get('resample_how')
-        rule = fd.get('resample_rule')
-        if how and rule:
-            df = df.resample(rule, how=how, fill_method=fm)
-
-        if self.sort_series:
-            dfs = df.sum()
-            dfs.sort_values(ascending=False, inplace=True)
-            df = df[dfs.index]
-
-        rolling_type = fd.get('rolling_type')
-        rolling_periods = int(fd.get('rolling_periods') or 0)
-        min_periods = int(fd.get('min_periods') or 0)
-
-        if rolling_type in ('mean', 'std', 'sum') and rolling_periods:
-            kwargs = dict(
-                window=rolling_periods,
-                min_periods=min_periods)
-            if rolling_type == 'mean':
-                df = df.rolling(**kwargs).mean()
-            elif rolling_type == 'std':
-                df = df.rolling(**kwargs).std()
-            elif rolling_type == 'sum':
-                df = df.rolling(**kwargs).sum()
-        elif rolling_type == 'cumsum':
-            df = df.cumsum()
-        if min_periods:
-            df = df[min_periods:]
-
-        if fd.get('contribution'):
-            dft = df.T
-            df = (dft / dft.sum()).T
-
-        return df
-
-    def run_extra_queries(self):
-        fd = self.form_data
-
-        time_compare = fd.get('time_compare') or []
-        # backwards compatibility
-        if not isinstance(time_compare, list):
-            time_compare = [time_compare]
-
-        for option in time_compare:
-            query_object = self.query_obj()
-            delta = utils.parse_human_timedelta(option)
-            query_object['inner_from_dttm'] = query_object['from_dttm']
-            query_object['inner_to_dttm'] = query_object['to_dttm']
-
-            if not query_object['from_dttm'] or not query_object['to_dttm']:
-                raise Exception(_(
-                    '`Since` and `Until` time bounds should be specified '
-                    'when using the `Time Shift` feature.'))
-            query_object['from_dttm'] -= delta
-            query_object['to_dttm'] -= delta
-
-            df2 = self.get_df_payload(query_object, time_compare=option).get('df')
-            if df2 is not None and DTTM_ALIAS in df2:
-                label = '{} offset'. format(option)
-                df2[DTTM_ALIAS] += delta
-                df2 = self.process_data(df2)
-                self._extra_chart_data.append((label, df2))
-
-    def get_data(self, df):
-        fd = self.form_data
-        comparison_type = fd.get('comparison_type') or 'values'
-        df = self.process_data(df)
-        if comparison_type == 'values':
-            # Filter out series with all NaN
-            chart_data = self.to_series(df.dropna(axis=1, how='all'))
-
-            for i, (label, df2) in enumerate(self._extra_chart_data):
-                chart_data.extend(
-                    self.to_series(
-                        df2, classed='time-shift-{}'.format(i), title_suffix=label))
-        else:
-            chart_data = []
-            for i, (label, df2) in enumerate(self._extra_chart_data):
-                # reindex df2 into the df2 index
-                combined_index = df.index.union(df2.index)
-                df2 = df2.reindex(combined_index) \
-                    .interpolate(method='time') \
-                    .reindex(df.index)
-
-                if comparison_type == 'absolute':
-                    diff = df - df2
-                elif comparison_type == 'percentage':
-                    diff = (df - df2) / df2
-                elif comparison_type == 'ratio':
-                    diff = df / df2
-                else:
-                    raise Exception(
-                        'Invalid `comparison_type`: {0}'.format(comparison_type))
-
-                # remove leading/trailing NaNs from the time shift difference
-                diff = diff[diff.first_valid_index():diff.last_valid_index()]
-
-                chart_data.extend(
-                    self.to_series(
-                        diff, classed='time-shift-{}'.format(i), title_suffix=label))
-
-        if not self.sort_series:
-            chart_data = sorted(chart_data, key=lambda x: tuple(x['key']))
-        return chart_data
+# class BoxPlotViz(NVD3Viz):
+#
+#     """Box plot viz from ND3"""
+#
+#     viz_type = 'box_plot'
+#     verbose_name = _('Box Plot')
+#     sort_series = False
+#     is_timeseries = True
+#
+#     def to_series(self, df, classed='', title_suffix=''):
+#         label_sep = ' - '
+#         chart_data = []
+#         for index_value, row in zip(df.index, df.to_dict(orient='records')):
+#             if isinstance(index_value, tuple):
+#                 index_value = label_sep.join(index_value)
+#             boxes = defaultdict(dict)
+#             for (label, key), value in row.items():
+#                 if key == 'nanmedian':
+#                     key = 'Q2'
+#                 boxes[label][key] = value
+#             for label, box in boxes.items():
+#                 if len(self.form_data.get('metrics')) > 1:
+#                     # need to render data labels with metrics
+#                     chart_label = label_sep.join([index_value, label])
+#                 else:
+#                     chart_label = index_value
+#                 chart_data.append({
+#                     'label': chart_label,
+#                     'values': box,
+#                 })
+#         return chart_data
+#
+#     def get_data(self, df):
+#         form_data = self.form_data
+#
+#         # conform to NVD3 names
+#         def Q1(series):  # need to be named functions - can't use lambdas
+#             return np.nanpercentile(series, 25)
+#
+#         def Q3(series):
+#             return np.nanpercentile(series, 75)
+#
+#         whisker_type = form_data.get('whisker_options')
+#         if whisker_type == 'Tukey':
+#
+#             def whisker_high(series):
+#                 upper_outer_lim = Q3(series) + 1.5 * (Q3(series) - Q1(series))
+#                 return series[series <= upper_outer_lim].max()
+#
+#             def whisker_low(series):
+#                 lower_outer_lim = Q1(series) - 1.5 * (Q3(series) - Q1(series))
+#                 return series[series >= lower_outer_lim].min()
+#
+#         elif whisker_type == 'Min/max (no outliers)':
+#
+#             def whisker_high(series):
+#                 return series.max()
+#
+#             def whisker_low(series):
+#                 return series.min()
+#
+#         elif ' percentiles' in whisker_type:
+#             low, high = whisker_type.replace(' percentiles', '').split('/')
+#
+#             def whisker_high(series):
+#                 return np.nanpercentile(series, int(high))
+#
+#             def whisker_low(series):
+#                 return np.nanpercentile(series, int(low))
+#
+#         else:
+#             raise ValueError('Unknown whisker type: {}'.format(whisker_type))
+#
+#         def outliers(series):
+#             above = series[series > whisker_high(series)]
+#             below = series[series < whisker_low(series)]
+#             # pandas sometimes doesn't like getting lists back here
+#             return set(above.tolist() + below.tolist())
+#
+#         aggregate = [Q1, np.nanmedian, Q3, whisker_high, whisker_low, outliers]
+#         df = df.groupby(form_data.get('groupby')).agg(aggregate)
+#         chart_data = self.to_series(df)
+#         return chart_data
+#
+#
+# class BubbleViz(NVD3Viz):
+#
+#     """Based on the NVD3 bubble chart"""
+#
+#     viz_type = 'bubble'
+#     verbose_name = _('Bubble Chart')
+#     is_timeseries = False
+#
+#     def query_obj(self):
+#         form_data = self.form_data
+#         d = super().query_obj()
+#         d['groupby'] = [
+#             form_data.get('entity'),
+#         ]
+#         if form_data.get('series'):
+#             d['groupby'].append(form_data.get('series'))
+#         self.x_metric = form_data.get('x')
+#         self.y_metric = form_data.get('y')
+#         self.z_metric = form_data.get('size')
+#         self.entity = form_data.get('entity')
+#         self.series = form_data.get('series') or self.entity
+#         d['row_limit'] = form_data.get('limit')
+#
+#         d['metrics'] = list(set([
+#             self.z_metric,
+#             self.x_metric,
+#             self.y_metric,
+#         ]))
+#         if not all(d['metrics'] + [self.entity]):
+#             raise Exception(_('Pick a metric for x, y and size'))
+#         return d
+#
+#     def get_data(self, df):
+#         df['x'] = df[[utils.get_metric_name(self.x_metric)]]
+#         df['y'] = df[[utils.get_metric_name(self.y_metric)]]
+#         df['size'] = df[[utils.get_metric_name(self.z_metric)]]
+#         df['shape'] = 'circle'
+#         df['group'] = df[[self.series]]
+#
+#         series = defaultdict(list)
+#         for row in df.to_dict(orient='records'):
+#             series[row['group']].append(row)
+#         chart_data = []
+#         for k, v in series.items():
+#             chart_data.append({
+#                 'key': k,
+#                 'values': v})
+#         return chart_data
+#
+#
+# class BulletViz(NVD3Viz):
+#
+#     """Based on the NVD3 bullet chart"""
+#
+#     viz_type = 'bullet'
+#     verbose_name = _('Bullet Chart')
+#     is_timeseries = False
+#
+#     def query_obj(self):
+#         form_data = self.form_data
+#         d = super().query_obj()
+#         self.metric = form_data.get('metric')
+#
+#         def as_strings(field):
+#             value = form_data.get(field)
+#             return value.split(',') if value else []
+#
+#         def as_floats(field):
+#             return [float(x) for x in as_strings(field)]
+#
+#         self.ranges = as_floats('ranges')
+#         self.range_labels = as_strings('range_labels')
+#         self.markers = as_floats('markers')
+#         self.marker_labels = as_strings('marker_labels')
+#         self.marker_lines = as_floats('marker_lines')
+#         self.marker_line_labels = as_strings('marker_line_labels')
+#
+#         d['metrics'] = [
+#             self.metric,
+#         ]
+#         if not self.metric:
+#             raise Exception(_('Pick a metric to display'))
+#         return d
+#
+#     def get_data(self, df):
+#         df['metric'] = df[[utils.get_metric_name(self.metric)]]
+#         values = df['metric'].values
+#         return {
+#             'measures': values.tolist(),
+#             'ranges': self.ranges or [0, values.max() * 1.1],
+#             'rangeLabels': self.range_labels or None,
+#             'markers': self.markers or None,
+#             'markerLabels': self.marker_labels or None,
+#             'markerLines': self.marker_lines or None,
+#             'markerLineLabels': self.marker_line_labels or None,
+#         }
+#
+#
+# class BigNumberViz(BaseViz):
+#
+#     """Put emphasis on a single metric with this big number viz"""
+#
+#     viz_type = 'big_number'
+#     verbose_name = _('Big Number with Trendline')
+#     credits = 'a <a href="https://github.com/airbnb/superset">Superset</a> original'
+#     is_timeseries = True
+#
+#     def query_obj(self):
+#         d = super().query_obj()
+#         metric = self.form_data.get('metric')
+#         if not metric:
+#             raise Exception(_('Pick a metric!'))
+#         d['metrics'] = [self.form_data.get('metric')]
+#         self.form_data['metric'] = metric
+#         return d
+#
+#
+# class BigNumberTotalViz(BaseViz):
+#
+#     """Put emphasis on a single metric with this big number viz"""
+#
+#     viz_type = 'big_number_total'
+#     verbose_name = _('Big Number')
+#     credits = 'a <a href="https://github.com/airbnb/superset">Superset</a> original'
+#     is_timeseries = False
+#
+#     def query_obj(self):
+#         d = super().query_obj()
+#         metric = self.form_data.get('metric')
+#         if not metric:
+#             raise Exception(_('Pick a metric!'))
+#         d['metrics'] = [self.form_data.get('metric')]
+#         self.form_data['metric'] = metric
+#         return d
+#
+#
+# class NVD3TimeSeriesViz(NVD3Viz):
+#
+#     """A rich line chart component with tons of options"""
+#
+#     viz_type = 'line'
+#     verbose_name = _('Time Series - Line Chart')
+#     sort_series = False
+#     is_timeseries = True
+#
+#     def to_series(self, df, classed='', title_suffix=''):
+#         cols = []
+#         for col in df.columns:
+#             if col == '':
+#                 cols.append('N/A')
+#             elif col is None:
+#                 cols.append('NULL')
+#             else:
+#                 cols.append(col)
+#         df.columns = cols
+#         series = df.to_dict('series')
+#
+#         chart_data = []
+#         for name in df.T.index.tolist():
+#             ys = series[name]
+#             if df[name].dtype.kind not in 'biufc':
+#                 continue
+#             if isinstance(name, list):
+#                 series_title = [str(title) for title in name]
+#             elif isinstance(name, tuple):
+#                 series_title = tuple(str(title) for title in name)
+#             else:
+#                 series_title = str(name)
+#             if (
+#                     isinstance(series_title, (list, tuple)) and
+#                     len(series_title) > 1 and
+#                     len(self.metric_labels) == 1):
+#                 # Removing metric from series name if only one metric
+#                 series_title = series_title[1:]
+#             if title_suffix:
+#                 if isinstance(series_title, str):
+#                     series_title = (series_title, title_suffix)
+#                 elif isinstance(series_title, (list, tuple)):
+#                     series_title = series_title + (title_suffix,)
+#
+#             values = []
+#             non_nan_cnt = 0
+#             for ds in df.index:
+#                 if ds in ys:
+#                     d = {
+#                         'x': ds,
+#                         'y': ys[ds],
+#                     }
+#                     if not np.isnan(ys[ds]):
+#                         non_nan_cnt += 1
+#                 else:
+#                     d = {}
+#                 values.append(d)
+#
+#             if non_nan_cnt == 0:
+#                 continue
+#
+#             d = {
+#                 'key': series_title,
+#                 'values': values,
+#             }
+#             if classed:
+#                 d['classed'] = classed
+#             chart_data.append(d)
+#         return chart_data
+#
+#     def process_data(self, df, aggregate=False):
+#         fd = self.form_data
+#         if fd.get('granularity') == 'all':
+#             raise Exception(_('Pick a time granularity for your time series'))
+#
+#         if not aggregate:
+#             df = df.pivot_table(
+#                 index=DTTM_ALIAS,
+#                 columns=fd.get('groupby'),
+#                 values=self.metric_labels,
+#                 dropna=False,
+#             )
+#         else:
+#             df = df.pivot_table(
+#                 index=DTTM_ALIAS,
+#                 columns=fd.get('groupby'),
+#                 values=self.metric_labels,
+#                 fill_value=0,
+#                 aggfunc=sum,
+#                 dropna=False,
+#             )
+#
+#         fm = fd.get('resample_fillmethod')
+#         if not fm:
+#             fm = None
+#         how = fd.get('resample_how')
+#         rule = fd.get('resample_rule')
+#         if how and rule:
+#             df = df.resample(rule, how=how, fill_method=fm)
+#
+#         if self.sort_series:
+#             dfs = df.sum()
+#             dfs.sort_values(ascending=False, inplace=True)
+#             df = df[dfs.index]
+#
+#         rolling_type = fd.get('rolling_type')
+#         rolling_periods = int(fd.get('rolling_periods') or 0)
+#         min_periods = int(fd.get('min_periods') or 0)
+#
+#         if rolling_type in ('mean', 'std', 'sum') and rolling_periods:
+#             kwargs = dict(
+#                 window=rolling_periods,
+#                 min_periods=min_periods)
+#             if rolling_type == 'mean':
+#                 df = df.rolling(**kwargs).mean()
+#             elif rolling_type == 'std':
+#                 df = df.rolling(**kwargs).std()
+#             elif rolling_type == 'sum':
+#                 df = df.rolling(**kwargs).sum()
+#         elif rolling_type == 'cumsum':
+#             df = df.cumsum()
+#         if min_periods:
+#             df = df[min_periods:]
+#
+#         if fd.get('contribution'):
+#             dft = df.T
+#             df = (dft / dft.sum()).T
+#
+#         return df
+#
+#     def run_extra_queries(self):
+#         fd = self.form_data
+#
+#         time_compare = fd.get('time_compare') or []
+#         # backwards compatibility
+#         if not isinstance(time_compare, list):
+#             time_compare = [time_compare]
+#
+#         for option in time_compare:
+#             query_object = self.query_obj()
+#             delta = utils.parse_human_timedelta(option)
+#             query_object['inner_from_dttm'] = query_object['from_dttm']
+#             query_object['inner_to_dttm'] = query_object['to_dttm']
+#
+#             if not query_object['from_dttm'] or not query_object['to_dttm']:
+#                 raise Exception(_(
+#                     '`Since` and `Until` time bounds should be specified '
+#                     'when using the `Time Shift` feature.'))
+#             query_object['from_dttm'] -= delta
+#             query_object['to_dttm'] -= delta
+#
+#             df2 = self.get_df_payload(query_object, time_compare=option).get('df')
+#             if df2 is not None and DTTM_ALIAS in df2:
+#                 label = '{} offset'. format(option)
+#                 df2[DTTM_ALIAS] += delta
+#                 df2 = self.process_data(df2)
+#                 self._extra_chart_data.append((label, df2))
+#
+#     def get_data(self, df):
+#         fd = self.form_data
+#         comparison_type = fd.get('comparison_type') or 'values'
+#         df = self.process_data(df)
+#         if comparison_type == 'values':
+#             # Filter out series with all NaN
+#             chart_data = self.to_series(df.dropna(axis=1, how='all'))
+#
+#             for i, (label, df2) in enumerate(self._extra_chart_data):
+#                 chart_data.extend(
+#                     self.to_series(
+#                         df2, classed='time-shift-{}'.format(i), title_suffix=label))
+#         else:
+#             chart_data = []
+#             for i, (label, df2) in enumerate(self._extra_chart_data):
+#                 # reindex df2 into the df2 index
+#                 combined_index = df.index.union(df2.index)
+#                 df2 = df2.reindex(combined_index) \
+#                     .interpolate(method='time') \
+#                     .reindex(df.index)
+#
+#                 if comparison_type == 'absolute':
+#                     diff = df - df2
+#                 elif comparison_type == 'percentage':
+#                     diff = (df - df2) / df2
+#                 elif comparison_type == 'ratio':
+#                     diff = df / df2
+#                 else:
+#                     raise Exception(
+#                         'Invalid `comparison_type`: {0}'.format(comparison_type))
+#
+#                 # remove leading/trailing NaNs from the time shift difference
+#                 diff = diff[diff.first_valid_index():diff.last_valid_index()]
+#
+#                 chart_data.extend(
+#                     self.to_series(
+#                         diff, classed='time-shift-{}'.format(i), title_suffix=label))
+#
+#         if not self.sort_series:
+#             chart_data = sorted(chart_data, key=lambda x: tuple(x['key']))
+#         return chart_data
 
 
 class MultiLineViz(NVD3Viz):
