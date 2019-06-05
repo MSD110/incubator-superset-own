@@ -1268,178 +1268,178 @@ class NVD3TimeSeriesViz(NVD3Viz):
         return chart_data
 
 
-class MultiLineViz(NVD3Viz):
-
-    """Pile on multiple line charts"""
-
-    viz_type = 'line_multi'
-    verbose_name = _('Time Series - Multiple Line Charts')
-
-    is_timeseries = True
-
-    def query_obj(self):
-        return None
-
-    def get_data(self, df):
-        fd = self.form_data
-        # Late imports to avoid circular import issues
-        from superset.models.core import Slice
-        from superset import db
-        slice_ids1 = fd.get('line_charts')
-        slices1 = db.session.query(Slice).filter(Slice.id.in_(slice_ids1)).all()
-        slice_ids2 = fd.get('line_charts_2')
-        slices2 = db.session.query(Slice).filter(Slice.id.in_(slice_ids2)).all()
-        return {
-            'slices': {
-                'axis1': [slc.data for slc in slices1],
-                'axis2': [slc.data for slc in slices2],
-            },
-        }
-
-
-class NVD3DualLineViz(NVD3Viz):
-
-    """A rich line chart with dual axis"""
-
-    viz_type = 'dual_line'
-    verbose_name = _('Time Series - Dual Axis Line Chart')
-    sort_series = False
-    is_timeseries = True
-
-    def query_obj(self):
-        d = super().query_obj()
-        m1 = self.form_data.get('metric')
-        m2 = self.form_data.get('metric_2')
-        d['metrics'] = [m1, m2]
-        if not m1:
-            raise Exception(_('Pick a metric for left axis!'))
-        if not m2:
-            raise Exception(_('Pick a metric for right axis!'))
-        if m1 == m2:
-            raise Exception(_('Please choose different metrics'
-                            ' on left and right axis'))
-        return d
-
-    def to_series(self, df, classed=''):
-        cols = []
-        for col in df.columns:
-            if col == '':
-                cols.append('N/A')
-            elif col is None:
-                cols.append('NULL')
-            else:
-                cols.append(col)
-        df.columns = cols
-        series = df.to_dict('series')
-        chart_data = []
-        metrics = [
-            self.form_data.get('metric'),
-            self.form_data.get('metric_2'),
-        ]
-        for i, m in enumerate(metrics):
-            m = utils.get_metric_name(m)
-            ys = series[m]
-            if df[m].dtype.kind not in 'biufc':
-                continue
-            series_title = m
-            d = {
-                'key': series_title,
-                'classed': classed,
-                'values': [
-                    {'x': ds, 'y': ys[ds] if ds in ys else None}
-                    for ds in df.index
-                ],
-                'yAxis': i + 1,
-                'type': 'line',
-            }
-            chart_data.append(d)
-        return chart_data
-
-    def get_data(self, df):
-        fd = self.form_data
-
-        if self.form_data.get('granularity') == 'all':
-            raise Exception(_('Pick a time granularity for your time series'))
-
-        metric = utils.get_metric_name(fd.get('metric'))
-        metric_2 = utils.get_metric_name(fd.get('metric_2'))
-        df = df.pivot_table(
-            index=DTTM_ALIAS,
-            values=[metric, metric_2],
-            dropna=False,
-        )
-
-        chart_data = self.to_series(df)
-        return chart_data
-
-
-class NVD3TimeSeriesBarViz(NVD3TimeSeriesViz):
-
-    """A bar chart where the x axis is time"""
-
-    viz_type = 'bar'
-    sort_series = True
-    verbose_name = _('Time Series - Bar Chart')
-
-
-class NVD3TimePivotViz(NVD3TimeSeriesViz):
-
-    """Time Series - Periodicity Pivot"""
-
-    viz_type = 'time_pivot'
-    sort_series = True
-    verbose_name = _('Time Series - Period Pivot')
-
-    def query_obj(self):
-        d = super().query_obj()
-        d['metrics'] = [self.form_data.get('metric')]
-        return d
-
-    def get_data(self, df):
-        fd = self.form_data
-        df = self.process_data(df)
-        freq = to_offset(fd.get('freq'))
-        freq.normalize = True
-        df[DTTM_ALIAS] = df.index.map(freq.rollback)
-        df['ranked'] = df[DTTM_ALIAS].rank(method='dense', ascending=False) - 1
-        df.ranked = df.ranked.map(int)
-        df['series'] = '-' + df.ranked.map(str)
-        df['series'] = df['series'].str.replace('-0', 'current')
-        rank_lookup = {
-            row['series']: row['ranked']
-            for row in df.to_dict(orient='records')
-        }
-        max_ts = df[DTTM_ALIAS].max()
-        max_rank = df['ranked'].max()
-        df[DTTM_ALIAS] = df.index + (max_ts - df[DTTM_ALIAS])
-        df = df.pivot_table(
-            index=DTTM_ALIAS,
-            columns='series',
-            values=utils.get_metric_name(fd.get('metric')),
-            dropna=False,
-        )
-        chart_data = self.to_series(df)
-        for serie in chart_data:
-            serie['rank'] = rank_lookup[serie['key']]
-            serie['perc'] = 1 - (serie['rank'] / (max_rank + 1))
-        return chart_data
-
-
-class NVD3CompareTimeSeriesViz(NVD3TimeSeriesViz):
-
-    """A line chart component where you can compare the % change over time"""
-
-    viz_type = 'compare'
-    verbose_name = _('Time Series - Percent Change')
-
-
-class NVD3TimeSeriesStackedViz(NVD3TimeSeriesViz):
-
-    """A rich stack area chart"""
-
-    viz_type = 'area'
-    verbose_name = _('Time Series - Stacked')
-    sort_series = True
+# class MultiLineViz(NVD3Viz):
+#
+#     """Pile on multiple line charts"""
+#
+#     viz_type = 'line_multi'
+#     verbose_name = _('Time Series - Multiple Line Charts')
+#
+#     is_timeseries = True
+#
+#     def query_obj(self):
+#         return None
+#
+#     def get_data(self, df):
+#         fd = self.form_data
+#         # Late imports to avoid circular import issues
+#         from superset.models.core import Slice
+#         from superset import db
+#         slice_ids1 = fd.get('line_charts')
+#         slices1 = db.session.query(Slice).filter(Slice.id.in_(slice_ids1)).all()
+#         slice_ids2 = fd.get('line_charts_2')
+#         slices2 = db.session.query(Slice).filter(Slice.id.in_(slice_ids2)).all()
+#         return {
+#             'slices': {
+#                 'axis1': [slc.data for slc in slices1],
+#                 'axis2': [slc.data for slc in slices2],
+#             },
+#         }
+#
+#
+# class NVD3DualLineViz(NVD3Viz):
+#
+#     """A rich line chart with dual axis"""
+#
+#     viz_type = 'dual_line'
+#     verbose_name = _('Time Series - Dual Axis Line Chart')
+#     sort_series = False
+#     is_timeseries = True
+#
+#     def query_obj(self):
+#         d = super().query_obj()
+#         m1 = self.form_data.get('metric')
+#         m2 = self.form_data.get('metric_2')
+#         d['metrics'] = [m1, m2]
+#         if not m1:
+#             raise Exception(_('Pick a metric for left axis!'))
+#         if not m2:
+#             raise Exception(_('Pick a metric for right axis!'))
+#         if m1 == m2:
+#             raise Exception(_('Please choose different metrics'
+#                             ' on left and right axis'))
+#         return d
+#
+#     def to_series(self, df, classed=''):
+#         cols = []
+#         for col in df.columns:
+#             if col == '':
+#                 cols.append('N/A')
+#             elif col is None:
+#                 cols.append('NULL')
+#             else:
+#                 cols.append(col)
+#         df.columns = cols
+#         series = df.to_dict('series')
+#         chart_data = []
+#         metrics = [
+#             self.form_data.get('metric'),
+#             self.form_data.get('metric_2'),
+#         ]
+#         for i, m in enumerate(metrics):
+#             m = utils.get_metric_name(m)
+#             ys = series[m]
+#             if df[m].dtype.kind not in 'biufc':
+#                 continue
+#             series_title = m
+#             d = {
+#                 'key': series_title,
+#                 'classed': classed,
+#                 'values': [
+#                     {'x': ds, 'y': ys[ds] if ds in ys else None}
+#                     for ds in df.index
+#                 ],
+#                 'yAxis': i + 1,
+#                 'type': 'line',
+#             }
+#             chart_data.append(d)
+#         return chart_data
+#
+#     def get_data(self, df):
+#         fd = self.form_data
+#
+#         if self.form_data.get('granularity') == 'all':
+#             raise Exception(_('Pick a time granularity for your time series'))
+#
+#         metric = utils.get_metric_name(fd.get('metric'))
+#         metric_2 = utils.get_metric_name(fd.get('metric_2'))
+#         df = df.pivot_table(
+#             index=DTTM_ALIAS,
+#             values=[metric, metric_2],
+#             dropna=False,
+#         )
+#
+#         chart_data = self.to_series(df)
+#         return chart_data
+#
+#
+# class NVD3TimeSeriesBarViz(NVD3TimeSeriesViz):
+#
+#     """A bar chart where the x axis is time"""
+#
+#     viz_type = 'bar'
+#     sort_series = True
+#     verbose_name = _('Time Series - Bar Chart')
+#
+#
+# class NVD3TimePivotViz(NVD3TimeSeriesViz):
+#
+#     """Time Series - Periodicity Pivot"""
+#
+#     viz_type = 'time_pivot'
+#     sort_series = True
+#     verbose_name = _('Time Series - Period Pivot')
+#
+#     def query_obj(self):
+#         d = super().query_obj()
+#         d['metrics'] = [self.form_data.get('metric')]
+#         return d
+#
+#     def get_data(self, df):
+#         fd = self.form_data
+#         df = self.process_data(df)
+#         freq = to_offset(fd.get('freq'))
+#         freq.normalize = True
+#         df[DTTM_ALIAS] = df.index.map(freq.rollback)
+#         df['ranked'] = df[DTTM_ALIAS].rank(method='dense', ascending=False) - 1
+#         df.ranked = df.ranked.map(int)
+#         df['series'] = '-' + df.ranked.map(str)
+#         df['series'] = df['series'].str.replace('-0', 'current')
+#         rank_lookup = {
+#             row['series']: row['ranked']
+#             for row in df.to_dict(orient='records')
+#         }
+#         max_ts = df[DTTM_ALIAS].max()
+#         max_rank = df['ranked'].max()
+#         df[DTTM_ALIAS] = df.index + (max_ts - df[DTTM_ALIAS])
+#         df = df.pivot_table(
+#             index=DTTM_ALIAS,
+#             columns='series',
+#             values=utils.get_metric_name(fd.get('metric')),
+#             dropna=False,
+#         )
+#         chart_data = self.to_series(df)
+#         for serie in chart_data:
+#             serie['rank'] = rank_lookup[serie['key']]
+#             serie['perc'] = 1 - (serie['rank'] / (max_rank + 1))
+#         return chart_data
+#
+#
+# class NVD3CompareTimeSeriesViz(NVD3TimeSeriesViz):
+#
+#     """A line chart component where you can compare the % change over time"""
+#
+#     viz_type = 'compare'
+#     verbose_name = _('Time Series - Percent Change')
+#
+#
+# class NVD3TimeSeriesStackedViz(NVD3TimeSeriesViz):
+#
+#     """A rich stack area chart"""
+#
+#     viz_type = 'area'
+#     verbose_name = _('Time Series - Stacked')
+#     sort_series = True
 
 
 class DistributionPieViz(NVD3Viz):
