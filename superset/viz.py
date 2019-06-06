@@ -1442,140 +1442,140 @@ class NVD3TimeSeriesStackedViz(NVD3TimeSeriesViz):
     sort_series = True
 
 
-class DistributionPieViz(NVD3Viz):
-
-    """Annoy visualization snobs with this controversial pie chart"""
-
-    viz_type = 'pie'
-    verbose_name = _('Distribution - NVD3 - Pie Chart')
-    is_timeseries = False
-
-    def get_data(self, df):
-        metric = self.metric_labels[0]
-        df = df.pivot_table(
-            index=self.groupby,
-            values=[metric],
-            dropna=False,
-        )
-        df.sort_values(by=metric, ascending=False, inplace=True)
-        df = df.reset_index()
-        df.columns = ['x', 'y']
-        return df.to_dict(orient='records')
-
-
-class HistogramViz(BaseViz):
-
-    """Histogram"""
-
-    viz_type = 'histogram'
-    verbose_name = _('Histogram')
-    is_timeseries = False
-
-    def query_obj(self):
-        """Returns the query object for this visualization"""
-        d = super().query_obj()
-        d['row_limit'] = self.form_data.get(
-            'row_limit', int(config.get('VIZ_ROW_LIMIT')))
-        numeric_columns = self.form_data.get('all_columns_x')
-        if numeric_columns is None:
-            raise Exception(_('Must have at least one numeric column specified'))
-        self.columns = numeric_columns
-        d['columns'] = numeric_columns + self.groupby
-        # override groupby entry to avoid aggregation
-        d['groupby'] = []
-        return d
-
-    def labelify(self, keys, column):
-        if isinstance(keys, str):
-            keys = (keys,)
-        # removing undesirable characters
-        labels = [re.sub(r'\W+', r'_', k) for k in keys]
-        if len(self.columns) > 1 or not self.groupby:
-            # Only show numeric column in label if there are many
-            labels = [column] + labels
-        return '__'.join(labels)
-
-    def get_data(self, df):
-        """Returns the chart data"""
-        chart_data = []
-        if len(self.groupby) > 0:
-            groups = df.groupby(self.groupby)
-        else:
-            groups = [((), df)]
-        for keys, data in groups:
-            chart_data.extend([{
-                'key': self.labelify(keys, column),
-                'values': data[column].tolist()}
-                for column in self.columns])
-        return chart_data
-
-
-class DistributionBarViz(DistributionPieViz):
-
-    """A good old bar chart"""
-
-    viz_type = 'dist_bar'
-    verbose_name = _('Distribution - Bar Chart')
-    is_timeseries = False
-
-    def query_obj(self):
-        d = super().query_obj()  # noqa
-        fd = self.form_data
-        if (
-            len(d['groupby']) <
-            len(fd.get('groupby') or []) + len(fd.get('columns') or [])
-        ):
-            raise Exception(
-                _("Can't have overlap between Series and Breakdowns"))
-        if not fd.get('metrics'):
-            raise Exception(_('Pick at least one metric'))
-        if not fd.get('groupby'):
-            raise Exception(_('Pick at least one field for [Series]'))
-        return d
-
-    def get_data(self, df):
-        fd = self.form_data
-        metrics = self.metric_labels
-
-        row = df.groupby(self.groupby).sum()[metrics[0]].copy()
-        row.sort_values(ascending=False, inplace=True)
-        columns = fd.get('columns') or []
-        pt = df.pivot_table(
-            index=self.groupby,
-            columns=columns,
-            values=metrics,
-            dropna=False,
-        )
-        if fd.get('contribution'):
-            pt = pt.T
-            pt = (pt / pt.sum()).T
-        pt = pt.reindex(row.index)
-        chart_data = []
-        for name, ys in pt.items():
-            if pt[name].dtype.kind not in 'biufc' or name in self.groupby:
-                continue
-            if isinstance(name, str):
-                series_title = name
-            else:
-                offset = 0 if len(metrics) > 1 else 1
-                series_title = ', '.join([str(s) for s in name[offset:]])
-            values = []
-            for i, v in ys.items():
-                x = i
-                if isinstance(x, (tuple, list)):
-                    x = ', '.join([str(s) for s in x])
-                else:
-                    x = str(x)
-                values.append({
-                    'x': x,
-                    'y': v,
-                })
-            d = {
-                'key': series_title,
-                'values': values,
-            }
-            chart_data.append(d)
-        return chart_data
+# class DistributionPieViz(NVD3Viz):
+#
+#     """Annoy visualization snobs with this controversial pie chart"""
+#
+#     viz_type = 'pie'
+#     verbose_name = _('Distribution - NVD3 - Pie Chart')
+#     is_timeseries = False
+#
+#     def get_data(self, df):
+#         metric = self.metric_labels[0]
+#         df = df.pivot_table(
+#             index=self.groupby,
+#             values=[metric],
+#             dropna=False,
+#         )
+#         df.sort_values(by=metric, ascending=False, inplace=True)
+#         df = df.reset_index()
+#         df.columns = ['x', 'y']
+#         return df.to_dict(orient='records')
+#
+#
+# class HistogramViz(BaseViz):
+#
+#     """Histogram"""
+#
+#     viz_type = 'histogram'
+#     verbose_name = _('Histogram')
+#     is_timeseries = False
+#
+#     def query_obj(self):
+#         """Returns the query object for this visualization"""
+#         d = super().query_obj()
+#         d['row_limit'] = self.form_data.get(
+#             'row_limit', int(config.get('VIZ_ROW_LIMIT')))
+#         numeric_columns = self.form_data.get('all_columns_x')
+#         if numeric_columns is None:
+#             raise Exception(_('Must have at least one numeric column specified'))
+#         self.columns = numeric_columns
+#         d['columns'] = numeric_columns + self.groupby
+#         # override groupby entry to avoid aggregation
+#         d['groupby'] = []
+#         return d
+#
+#     def labelify(self, keys, column):
+#         if isinstance(keys, str):
+#             keys = (keys,)
+#         # removing undesirable characters
+#         labels = [re.sub(r'\W+', r'_', k) for k in keys]
+#         if len(self.columns) > 1 or not self.groupby:
+#             # Only show numeric column in label if there are many
+#             labels = [column] + labels
+#         return '__'.join(labels)
+#
+#     def get_data(self, df):
+#         """Returns the chart data"""
+#         chart_data = []
+#         if len(self.groupby) > 0:
+#             groups = df.groupby(self.groupby)
+#         else:
+#             groups = [((), df)]
+#         for keys, data in groups:
+#             chart_data.extend([{
+#                 'key': self.labelify(keys, column),
+#                 'values': data[column].tolist()}
+#                 for column in self.columns])
+#         return chart_data
+#
+#
+# class DistributionBarViz(DistributionPieViz):
+#
+#     """A good old bar chart"""
+#
+#     viz_type = 'dist_bar'
+#     verbose_name = _('Distribution - Bar Chart')
+#     is_timeseries = False
+#
+#     def query_obj(self):
+#         d = super().query_obj()  # noqa
+#         fd = self.form_data
+#         if (
+#             len(d['groupby']) <
+#             len(fd.get('groupby') or []) + len(fd.get('columns') or [])
+#         ):
+#             raise Exception(
+#                 _("Can't have overlap between Series and Breakdowns"))
+#         if not fd.get('metrics'):
+#             raise Exception(_('Pick at least one metric'))
+#         if not fd.get('groupby'):
+#             raise Exception(_('Pick at least one field for [Series]'))
+#         return d
+#
+#     def get_data(self, df):
+#         fd = self.form_data
+#         metrics = self.metric_labels
+#
+#         row = df.groupby(self.groupby).sum()[metrics[0]].copy()
+#         row.sort_values(ascending=False, inplace=True)
+#         columns = fd.get('columns') or []
+#         pt = df.pivot_table(
+#             index=self.groupby,
+#             columns=columns,
+#             values=metrics,
+#             dropna=False,
+#         )
+#         if fd.get('contribution'):
+#             pt = pt.T
+#             pt = (pt / pt.sum()).T
+#         pt = pt.reindex(row.index)
+#         chart_data = []
+#         for name, ys in pt.items():
+#             if pt[name].dtype.kind not in 'biufc' or name in self.groupby:
+#                 continue
+#             if isinstance(name, str):
+#                 series_title = name
+#             else:
+#                 offset = 0 if len(metrics) > 1 else 1
+#                 series_title = ', '.join([str(s) for s in name[offset:]])
+#             values = []
+#             for i, v in ys.items():
+#                 x = i
+#                 if isinstance(x, (tuple, list)):
+#                     x = ', '.join([str(s) for s in x])
+#                 else:
+#                     x = str(x)
+#                 values.append({
+#                     'x': x,
+#                     'y': v,
+#                 })
+#             d = {
+#                 'key': series_title,
+#                 'values': values,
+#             }
+#             chart_data.append(d)
+#         return chart_data
 
 
 class SunburstViz(BaseViz):
