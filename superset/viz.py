@@ -1510,458 +1510,458 @@ class HistogramViz(BaseViz):
         return chart_data
 
 
-class DistributionBarViz(DistributionPieViz):
-
-    """A good old bar chart"""
-
-    viz_type = 'dist_bar'
-    verbose_name = _('Distribution - Bar Chart')
-    is_timeseries = False
-
-    def query_obj(self):
-        d = super().query_obj()  # noqa
-        fd = self.form_data
-        if (
-            len(d['groupby']) <
-            len(fd.get('groupby') or []) + len(fd.get('columns') or [])
-        ):
-            raise Exception(
-                _("Can't have overlap between Series and Breakdowns"))
-        if not fd.get('metrics'):
-            raise Exception(_('Pick at least one metric'))
-        if not fd.get('groupby'):
-            raise Exception(_('Pick at least one field for [Series]'))
-        return d
-
-    def get_data(self, df):
-        fd = self.form_data
-        metrics = self.metric_labels
-
-        row = df.groupby(self.groupby).sum()[metrics[0]].copy()
-        row.sort_values(ascending=False, inplace=True)
-        columns = fd.get('columns') or []
-        pt = df.pivot_table(
-            index=self.groupby,
-            columns=columns,
-            values=metrics,
-            dropna=False,
-        )
-        if fd.get('contribution'):
-            pt = pt.T
-            pt = (pt / pt.sum()).T
-        pt = pt.reindex(row.index)
-        chart_data = []
-        for name, ys in pt.items():
-            if pt[name].dtype.kind not in 'biufc' or name in self.groupby:
-                continue
-            if isinstance(name, str):
-                series_title = name
-            else:
-                offset = 0 if len(metrics) > 1 else 1
-                series_title = ', '.join([str(s) for s in name[offset:]])
-            values = []
-            for i, v in ys.items():
-                x = i
-                if isinstance(x, (tuple, list)):
-                    x = ', '.join([str(s) for s in x])
-                else:
-                    x = str(x)
-                values.append({
-                    'x': x,
-                    'y': v,
-                })
-            d = {
-                'key': series_title,
-                'values': values,
-            }
-            chart_data.append(d)
-        return chart_data
-
-
-class SunburstViz(BaseViz):
-
-    """A multi level sunburst chart"""
-
-    viz_type = 'sunburst'
-    verbose_name = _('Sunburst')
-    is_timeseries = False
-    credits = (
-        'Kerry Rodden '
-        '@<a href="https://bl.ocks.org/kerryrodden/7090426">bl.ocks.org</a>')
-
-    def get_data(self, df):
-        fd = self.form_data
-        cols = fd.get('groupby')
-        metric = utils.get_metric_name(fd.get('metric'))
-        secondary_metric = utils.get_metric_name(fd.get('secondary_metric'))
-        if metric == secondary_metric or secondary_metric is None:
-            df.columns = cols + ['m1']
-            df['m2'] = df['m1']
-        return json.loads(df.to_json(orient='values'))
-
-    def query_obj(self):
-        qry = super().query_obj()
-        fd = self.form_data
-        qry['metrics'] = [fd['metric']]
-        secondary_metric = fd.get('secondary_metric')
-        if secondary_metric and secondary_metric != fd['metric']:
-            qry['metrics'].append(secondary_metric)
-        return qry
-
-
-class SankeyViz(BaseViz):
-
-    """A Sankey diagram that requires a parent-child dataset"""
-
-    viz_type = 'sankey'
-    verbose_name = _('Sankey')
-    is_timeseries = False
-    credits = '<a href="https://www.npmjs.com/package/d3-sankey">d3-sankey on npm</a>'
-
-    def query_obj(self):
-        qry = super().query_obj()
-        if len(qry['groupby']) != 2:
-            raise Exception(_('Pick exactly 2 columns as [Source / Target]'))
-        qry['metrics'] = [
-            self.form_data['metric']]
-        return qry
-
-    def get_data(self, df):
-        df.columns = ['source', 'target', 'value']
-        df['source'] = df['source'].astype(str)
-        df['target'] = df['target'].astype(str)
-        recs = df.to_dict(orient='records')
-
-        hierarchy = defaultdict(set)
-        for row in recs:
-            hierarchy[row['source']].add(row['target'])
-
-        def find_cycle(g):
-            """Whether there's a cycle in a directed graph"""
-            path = set()
-
-            def visit(vertex):
-                path.add(vertex)
-                for neighbour in g.get(vertex, ()):
-                    if neighbour in path or visit(neighbour):
-                        return (vertex, neighbour)
-                path.remove(vertex)
-
-            for v in g:
-                cycle = visit(v)
-                if cycle:
-                    return cycle
-
-        cycle = find_cycle(hierarchy)
-        if cycle:
-            raise Exception(_(
-                "There's a loop in your Sankey, please provide a tree. "
-                "Here's a faulty link: {}").format(cycle))
-        return recs
-
-
-class DirectedForceViz(BaseViz):
-
-    """An animated directed force layout graph visualization"""
-
-    viz_type = 'directed_force'
-    verbose_name = _('Directed Force Layout')
-    credits = 'd3noob @<a href="http://bl.ocks.org/d3noob/5141278">bl.ocks.org</a>'
-    is_timeseries = False
-
-    def query_obj(self):
-        qry = super().query_obj()
-        if len(self.form_data['groupby']) != 2:
-            raise Exception(_("Pick exactly 2 columns to 'Group By'"))
-        qry['metrics'] = [self.form_data['metric']]
-        return qry
-
-    def get_data(self, df):
-        df.columns = ['source', 'target', 'value']
-        return df.to_dict(orient='records')
-
-
-class ChordViz(BaseViz):
-
-    """A Chord diagram"""
-
-    viz_type = 'chord'
-    verbose_name = _('Directed Force Layout')
-    credits = '<a href="https://github.com/d3/d3-chord">Bostock</a>'
-    is_timeseries = False
-
-    def query_obj(self):
-        qry = super().query_obj()
-        fd = self.form_data
-        qry['groupby'] = [fd.get('groupby'), fd.get('columns')]
-        qry['metrics'] = [utils.get_metric_name(fd.get('metric'))]
-        return qry
-
-    def get_data(self, df):
-        df.columns = ['source', 'target', 'value']
-
-        # Preparing a symetrical matrix like d3.chords calls for
-        nodes = list(set(df['source']) | set(df['target']))
-        matrix = {}
-        for source, target in product(nodes, nodes):
-            matrix[(source, target)] = 0
-        for source, target, value in df.to_records(index=False):
-            matrix[(source, target)] = value
-        m = [[matrix[(n1, n2)] for n1 in nodes] for n2 in nodes]
-        return {
-            'nodes': list(nodes),
-            'matrix': m,
-        }
-
-
-class CountryMapViz(BaseViz):
-
-    """A country centric"""
-
-    viz_type = 'country_map'
-    verbose_name = _('Country Map')
-    is_timeseries = False
-    credits = 'From bl.ocks.org By john-guerra'
-
-    def query_obj(self):
-        qry = super().query_obj()
-        qry['metrics'] = [
-            self.form_data['metric']]
-        qry['groupby'] = [self.form_data['entity']]
-        return qry
-
-    def get_data(self, df):
-        fd = self.form_data
-        cols = [fd.get('entity')]
-        metric = self.metric_labels[0]
-        cols += [metric]
-        ndf = df[cols]
-        df = ndf
-        df.columns = ['country_id', 'metric']
-        d = df.to_dict(orient='records')
-        return d
-
-
-class WorldMapViz(BaseViz):
-
-    """A country centric world map"""
-
-    viz_type = 'world_map'
-    verbose_name = _('World Map')
-    is_timeseries = False
-    credits = 'datamaps on <a href="https://www.npmjs.com/package/datamaps">npm</a>'
-
-    def query_obj(self):
-        qry = super().query_obj()
-        qry['groupby'] = [self.form_data['entity']]
-        return qry
-
-    def get_data(self, df):
-        from superset.data import countries
-        fd = self.form_data
-        cols = [fd.get('entity')]
-        metric = utils.get_metric_name(fd.get('metric'))
-        secondary_metric = utils.get_metric_name(fd.get('secondary_metric'))
-        columns = ['country', 'm1', 'm2']
-        if metric == secondary_metric:
-            ndf = df[cols]
-            # df[metric] will be a DataFrame
-            # because there are duplicate column names
-            ndf['m1'] = df[metric].iloc[:, 0]
-            ndf['m2'] = ndf['m1']
-        else:
-            if secondary_metric:
-                cols += [metric, secondary_metric]
-            else:
-                cols += [metric]
-                columns = ['country', 'm1']
-            ndf = df[cols]
-        df = ndf
-        df.columns = columns
-        d = df.to_dict(orient='records')
-        for row in d:
-            country = None
-            if isinstance(row['country'], str):
-                country = countries.get(
-                    fd.get('country_fieldtype'), row['country'])
-
-            if country:
-                row['country'] = country['cca3']
-                row['latitude'] = country['lat']
-                row['longitude'] = country['lng']
-                row['name'] = country['name']
-            else:
-                row['country'] = 'XXX'
-        return d
-
-
-class FilterBoxViz(BaseViz):
-
-    """A multi filter, multi-choice filter box to make dashboards interactive"""
-
-    viz_type = 'filter_box'
-    verbose_name = _('Filters')
-    is_timeseries = False
-    credits = 'a <a href="https://github.com/airbnb/superset">Superset</a> original'
-    cache_type = 'get_data'
-    filter_row_limit = 1000
-
-    def query_obj(self):
-        return None
-
-    def run_extra_queries(self):
-        qry = super().query_obj()
-        filters = self.form_data.get('filter_configs') or []
-        qry['row_limit'] = self.filter_row_limit
-        self.dataframes = {}
-        for flt in filters:
-            col = flt.get('column')
-            if not col:
-                raise Exception(_(
-                    'Invalid filter configuration, please select a column'))
-            qry['groupby'] = [col]
-            metric = flt.get('metric')
-            qry['metrics'] = [metric] if metric else []
-            df = self.get_df_payload(query_obj=qry).get('df')
-            self.dataframes[col] = df
-
-    def get_data(self, df):
-        filters = self.form_data.get('filter_configs') or []
-        d = {}
-        for flt in filters:
-            col = flt.get('column')
-            metric = flt.get('metric')
-            df = self.dataframes.get(col)
-            if metric:
-                df = df.sort_values(
-                    utils.get_metric_name(metric),
-                    ascending=flt.get('asc'),
-                )
-                d[col] = [{
-                    'id': row[0],
-                    'text': row[0],
-                    'metric': row[1]}
-                    for row in df.itertuples(index=False)
-                ]
-            else:
-                df = df.sort_values(col, ascending=flt.get('asc'))
-                d[col] = [{
-                    'id': row[0],
-                    'text': row[0]}
-                    for row in df.itertuples(index=False)
-                ]
-        return d
-
-
-class IFrameViz(BaseViz):
-
-    """You can squeeze just about anything in this iFrame component"""
-
-    viz_type = 'iframe'
-    verbose_name = _('iFrame')
-    credits = 'a <a href="https://github.com/airbnb/superset">Superset</a> original'
-    is_timeseries = False
-
-    def query_obj(self):
-        return None
-
-    def get_df(self, query_obj=None):
-        return None
-
-    def get_data(self, df):
-        return {}
-
-
-class ParallelCoordinatesViz(BaseViz):
-
-    """Interactive parallel coordinate implementation
-
-    Uses this amazing javascript library
-    https://github.com/syntagmatic/parallel-coordinates
-    """
-
-    viz_type = 'para'
-    verbose_name = _('Parallel Coordinates')
-    credits = (
-        '<a href="https://syntagmatic.github.io/parallel-coordinates/">'
-        "Syntagmatic's library</a>")
-    is_timeseries = False
-
-    def query_obj(self):
-        d = super().query_obj()
-        fd = self.form_data
-        d['groupby'] = [fd.get('series')]
-        return d
-
-    def get_data(self, df):
-        return df.to_dict(orient='records')
-
-
-class HeatmapViz(BaseViz):
-
-    """A nice heatmap visualization that support high density through canvas"""
-
-    viz_type = 'heatmap'
-    verbose_name = _('Heatmap')
-    is_timeseries = False
-    credits = (
-        'inspired from mbostock @<a href="http://bl.ocks.org/mbostock/3074470">'
-        'bl.ocks.org</a>')
-
-    def query_obj(self):
-        d = super().query_obj()
-        fd = self.form_data
-        d['metrics'] = [fd.get('metric')]
-        d['groupby'] = [fd.get('all_columns_x'), fd.get('all_columns_y')]
-        return d
-
-    def get_data(self, df):
-        fd = self.form_data
-        x = fd.get('all_columns_x')
-        y = fd.get('all_columns_y')
-        v = self.metric_labels[0]
-        if x == y:
-            df.columns = ['x', 'y', 'v']
-        else:
-            df = df[[x, y, v]]
-            df.columns = ['x', 'y', 'v']
-        norm = fd.get('normalize_across')
-        overall = False
-        max_ = df.v.max()
-        min_ = df.v.min()
-        if norm == 'heatmap':
-            overall = True
-        else:
-            gb = df.groupby(norm, group_keys=False)
-            if len(gb) <= 1:
-                overall = True
-            else:
-                df['perc'] = (
-                    gb.apply(
-                        lambda x: (x.v - x.v.min()) / (x.v.max() - x.v.min()))
-                )
-                df['rank'] = gb.apply(lambda x: x.v.rank(pct=True))
-        if overall:
-            df['perc'] = (df.v - min_) / (max_ - min_)
-            df['rank'] = df.v.rank(pct=True)
-        return {
-            'records': df.to_dict(orient='records'),
-            'extents': [min_, max_],
-        }
-
-
-class HorizonViz(NVD3TimeSeriesViz):
-
-    """Horizon chart
-
-    https://www.npmjs.com/package/d3-horizon-chart
-    """
-
-    viz_type = 'horizon'
-    verbose_name = _('Horizon Charts')
-    credits = (
-        '<a href="https://www.npmjs.com/package/d3-horizon-chart">'
-        'd3-horizon-chart</a>')
+# class DistributionBarViz(DistributionPieViz):
+#
+#     """A good old bar chart"""
+#
+#     viz_type = 'dist_bar'
+#     verbose_name = _('Distribution - Bar Chart')
+#     is_timeseries = False
+#
+#     def query_obj(self):
+#         d = super().query_obj()  # noqa
+#         fd = self.form_data
+#         if (
+#             len(d['groupby']) <
+#             len(fd.get('groupby') or []) + len(fd.get('columns') or [])
+#         ):
+#             raise Exception(
+#                 _("Can't have overlap between Series and Breakdowns"))
+#         if not fd.get('metrics'):
+#             raise Exception(_('Pick at least one metric'))
+#         if not fd.get('groupby'):
+#             raise Exception(_('Pick at least one field for [Series]'))
+#         return d
+#
+#     def get_data(self, df):
+#         fd = self.form_data
+#         metrics = self.metric_labels
+#
+#         row = df.groupby(self.groupby).sum()[metrics[0]].copy()
+#         row.sort_values(ascending=False, inplace=True)
+#         columns = fd.get('columns') or []
+#         pt = df.pivot_table(
+#             index=self.groupby,
+#             columns=columns,
+#             values=metrics,
+#             dropna=False,
+#         )
+#         if fd.get('contribution'):
+#             pt = pt.T
+#             pt = (pt / pt.sum()).T
+#         pt = pt.reindex(row.index)
+#         chart_data = []
+#         for name, ys in pt.items():
+#             if pt[name].dtype.kind not in 'biufc' or name in self.groupby:
+#                 continue
+#             if isinstance(name, str):
+#                 series_title = name
+#             else:
+#                 offset = 0 if len(metrics) > 1 else 1
+#                 series_title = ', '.join([str(s) for s in name[offset:]])
+#             values = []
+#             for i, v in ys.items():
+#                 x = i
+#                 if isinstance(x, (tuple, list)):
+#                     x = ', '.join([str(s) for s in x])
+#                 else:
+#                     x = str(x)
+#                 values.append({
+#                     'x': x,
+#                     'y': v,
+#                 })
+#             d = {
+#                 'key': series_title,
+#                 'values': values,
+#             }
+#             chart_data.append(d)
+#         return chart_data
+#
+#
+# class SunburstViz(BaseViz):
+#
+#     """A multi level sunburst chart"""
+#
+#     viz_type = 'sunburst'
+#     verbose_name = _('Sunburst')
+#     is_timeseries = False
+#     credits = (
+#         'Kerry Rodden '
+#         '@<a href="https://bl.ocks.org/kerryrodden/7090426">bl.ocks.org</a>')
+#
+#     def get_data(self, df):
+#         fd = self.form_data
+#         cols = fd.get('groupby')
+#         metric = utils.get_metric_name(fd.get('metric'))
+#         secondary_metric = utils.get_metric_name(fd.get('secondary_metric'))
+#         if metric == secondary_metric or secondary_metric is None:
+#             df.columns = cols + ['m1']
+#             df['m2'] = df['m1']
+#         return json.loads(df.to_json(orient='values'))
+#
+#     def query_obj(self):
+#         qry = super().query_obj()
+#         fd = self.form_data
+#         qry['metrics'] = [fd['metric']]
+#         secondary_metric = fd.get('secondary_metric')
+#         if secondary_metric and secondary_metric != fd['metric']:
+#             qry['metrics'].append(secondary_metric)
+#         return qry
+#
+#
+# class SankeyViz(BaseViz):
+#
+#     """A Sankey diagram that requires a parent-child dataset"""
+#
+#     viz_type = 'sankey'
+#     verbose_name = _('Sankey')
+#     is_timeseries = False
+#     credits = '<a href="https://www.npmjs.com/package/d3-sankey">d3-sankey on npm</a>'
+#
+#     def query_obj(self):
+#         qry = super().query_obj()
+#         if len(qry['groupby']) != 2:
+#             raise Exception(_('Pick exactly 2 columns as [Source / Target]'))
+#         qry['metrics'] = [
+#             self.form_data['metric']]
+#         return qry
+#
+#     def get_data(self, df):
+#         df.columns = ['source', 'target', 'value']
+#         df['source'] = df['source'].astype(str)
+#         df['target'] = df['target'].astype(str)
+#         recs = df.to_dict(orient='records')
+#
+#         hierarchy = defaultdict(set)
+#         for row in recs:
+#             hierarchy[row['source']].add(row['target'])
+#
+#         def find_cycle(g):
+#             """Whether there's a cycle in a directed graph"""
+#             path = set()
+#
+#             def visit(vertex):
+#                 path.add(vertex)
+#                 for neighbour in g.get(vertex, ()):
+#                     if neighbour in path or visit(neighbour):
+#                         return (vertex, neighbour)
+#                 path.remove(vertex)
+#
+#             for v in g:
+#                 cycle = visit(v)
+#                 if cycle:
+#                     return cycle
+#
+#         cycle = find_cycle(hierarchy)
+#         if cycle:
+#             raise Exception(_(
+#                 "There's a loop in your Sankey, please provide a tree. "
+#                 "Here's a faulty link: {}").format(cycle))
+#         return recs
+#
+#
+# class DirectedForceViz(BaseViz):
+#
+#     """An animated directed force layout graph visualization"""
+#
+#     viz_type = 'directed_force'
+#     verbose_name = _('Directed Force Layout')
+#     credits = 'd3noob @<a href="http://bl.ocks.org/d3noob/5141278">bl.ocks.org</a>'
+#     is_timeseries = False
+#
+#     def query_obj(self):
+#         qry = super().query_obj()
+#         if len(self.form_data['groupby']) != 2:
+#             raise Exception(_("Pick exactly 2 columns to 'Group By'"))
+#         qry['metrics'] = [self.form_data['metric']]
+#         return qry
+#
+#     def get_data(self, df):
+#         df.columns = ['source', 'target', 'value']
+#         return df.to_dict(orient='records')
+#
+#
+# class ChordViz(BaseViz):
+#
+#     """A Chord diagram"""
+#
+#     viz_type = 'chord'
+#     verbose_name = _('Directed Force Layout')
+#     credits = '<a href="https://github.com/d3/d3-chord">Bostock</a>'
+#     is_timeseries = False
+#
+#     def query_obj(self):
+#         qry = super().query_obj()
+#         fd = self.form_data
+#         qry['groupby'] = [fd.get('groupby'), fd.get('columns')]
+#         qry['metrics'] = [utils.get_metric_name(fd.get('metric'))]
+#         return qry
+#
+#     def get_data(self, df):
+#         df.columns = ['source', 'target', 'value']
+#
+#         # Preparing a symetrical matrix like d3.chords calls for
+#         nodes = list(set(df['source']) | set(df['target']))
+#         matrix = {}
+#         for source, target in product(nodes, nodes):
+#             matrix[(source, target)] = 0
+#         for source, target, value in df.to_records(index=False):
+#             matrix[(source, target)] = value
+#         m = [[matrix[(n1, n2)] for n1 in nodes] for n2 in nodes]
+#         return {
+#             'nodes': list(nodes),
+#             'matrix': m,
+#         }
+#
+#
+# class CountryMapViz(BaseViz):
+#
+#     """A country centric"""
+#
+#     viz_type = 'country_map'
+#     verbose_name = _('Country Map')
+#     is_timeseries = False
+#     credits = 'From bl.ocks.org By john-guerra'
+#
+#     def query_obj(self):
+#         qry = super().query_obj()
+#         qry['metrics'] = [
+#             self.form_data['metric']]
+#         qry['groupby'] = [self.form_data['entity']]
+#         return qry
+#
+#     def get_data(self, df):
+#         fd = self.form_data
+#         cols = [fd.get('entity')]
+#         metric = self.metric_labels[0]
+#         cols += [metric]
+#         ndf = df[cols]
+#         df = ndf
+#         df.columns = ['country_id', 'metric']
+#         d = df.to_dict(orient='records')
+#         return d
+#
+#
+# class WorldMapViz(BaseViz):
+#
+#     """A country centric world map"""
+#
+#     viz_type = 'world_map'
+#     verbose_name = _('World Map')
+#     is_timeseries = False
+#     credits = 'datamaps on <a href="https://www.npmjs.com/package/datamaps">npm</a>'
+#
+#     def query_obj(self):
+#         qry = super().query_obj()
+#         qry['groupby'] = [self.form_data['entity']]
+#         return qry
+#
+#     def get_data(self, df):
+#         from superset.data import countries
+#         fd = self.form_data
+#         cols = [fd.get('entity')]
+#         metric = utils.get_metric_name(fd.get('metric'))
+#         secondary_metric = utils.get_metric_name(fd.get('secondary_metric'))
+#         columns = ['country', 'm1', 'm2']
+#         if metric == secondary_metric:
+#             ndf = df[cols]
+#             # df[metric] will be a DataFrame
+#             # because there are duplicate column names
+#             ndf['m1'] = df[metric].iloc[:, 0]
+#             ndf['m2'] = ndf['m1']
+#         else:
+#             if secondary_metric:
+#                 cols += [metric, secondary_metric]
+#             else:
+#                 cols += [metric]
+#                 columns = ['country', 'm1']
+#             ndf = df[cols]
+#         df = ndf
+#         df.columns = columns
+#         d = df.to_dict(orient='records')
+#         for row in d:
+#             country = None
+#             if isinstance(row['country'], str):
+#                 country = countries.get(
+#                     fd.get('country_fieldtype'), row['country'])
+#
+#             if country:
+#                 row['country'] = country['cca3']
+#                 row['latitude'] = country['lat']
+#                 row['longitude'] = country['lng']
+#                 row['name'] = country['name']
+#             else:
+#                 row['country'] = 'XXX'
+#         return d
+#
+#
+# class FilterBoxViz(BaseViz):
+#
+#     """A multi filter, multi-choice filter box to make dashboards interactive"""
+#
+#     viz_type = 'filter_box'
+#     verbose_name = _('Filters')
+#     is_timeseries = False
+#     credits = 'a <a href="https://github.com/airbnb/superset">Superset</a> original'
+#     cache_type = 'get_data'
+#     filter_row_limit = 1000
+#
+#     def query_obj(self):
+#         return None
+#
+#     def run_extra_queries(self):
+#         qry = super().query_obj()
+#         filters = self.form_data.get('filter_configs') or []
+#         qry['row_limit'] = self.filter_row_limit
+#         self.dataframes = {}
+#         for flt in filters:
+#             col = flt.get('column')
+#             if not col:
+#                 raise Exception(_(
+#                     'Invalid filter configuration, please select a column'))
+#             qry['groupby'] = [col]
+#             metric = flt.get('metric')
+#             qry['metrics'] = [metric] if metric else []
+#             df = self.get_df_payload(query_obj=qry).get('df')
+#             self.dataframes[col] = df
+#
+#     def get_data(self, df):
+#         filters = self.form_data.get('filter_configs') or []
+#         d = {}
+#         for flt in filters:
+#             col = flt.get('column')
+#             metric = flt.get('metric')
+#             df = self.dataframes.get(col)
+#             if metric:
+#                 df = df.sort_values(
+#                     utils.get_metric_name(metric),
+#                     ascending=flt.get('asc'),
+#                 )
+#                 d[col] = [{
+#                     'id': row[0],
+#                     'text': row[0],
+#                     'metric': row[1]}
+#                     for row in df.itertuples(index=False)
+#                 ]
+#             else:
+#                 df = df.sort_values(col, ascending=flt.get('asc'))
+#                 d[col] = [{
+#                     'id': row[0],
+#                     'text': row[0]}
+#                     for row in df.itertuples(index=False)
+#                 ]
+#         return d
+#
+#
+# class IFrameViz(BaseViz):
+#
+#     """You can squeeze just about anything in this iFrame component"""
+#
+#     viz_type = 'iframe'
+#     verbose_name = _('iFrame')
+#     credits = 'a <a href="https://github.com/airbnb/superset">Superset</a> original'
+#     is_timeseries = False
+#
+#     def query_obj(self):
+#         return None
+#
+#     def get_df(self, query_obj=None):
+#         return None
+#
+#     def get_data(self, df):
+#         return {}
+#
+#
+# class ParallelCoordinatesViz(BaseViz):
+#
+#     """Interactive parallel coordinate implementation
+#
+#     Uses this amazing javascript library
+#     https://github.com/syntagmatic/parallel-coordinates
+#     """
+#
+#     viz_type = 'para'
+#     verbose_name = _('Parallel Coordinates')
+#     credits = (
+#         '<a href="https://syntagmatic.github.io/parallel-coordinates/">'
+#         "Syntagmatic's library</a>")
+#     is_timeseries = False
+#
+#     def query_obj(self):
+#         d = super().query_obj()
+#         fd = self.form_data
+#         d['groupby'] = [fd.get('series')]
+#         return d
+#
+#     def get_data(self, df):
+#         return df.to_dict(orient='records')
+#
+#
+# class HeatmapViz(BaseViz):
+#
+#     """A nice heatmap visualization that support high density through canvas"""
+#
+#     viz_type = 'heatmap'
+#     verbose_name = _('Heatmap')
+#     is_timeseries = False
+#     credits = (
+#         'inspired from mbostock @<a href="http://bl.ocks.org/mbostock/3074470">'
+#         'bl.ocks.org</a>')
+#
+#     def query_obj(self):
+#         d = super().query_obj()
+#         fd = self.form_data
+#         d['metrics'] = [fd.get('metric')]
+#         d['groupby'] = [fd.get('all_columns_x'), fd.get('all_columns_y')]
+#         return d
+#
+#     def get_data(self, df):
+#         fd = self.form_data
+#         x = fd.get('all_columns_x')
+#         y = fd.get('all_columns_y')
+#         v = self.metric_labels[0]
+#         if x == y:
+#             df.columns = ['x', 'y', 'v']
+#         else:
+#             df = df[[x, y, v]]
+#             df.columns = ['x', 'y', 'v']
+#         norm = fd.get('normalize_across')
+#         overall = False
+#         max_ = df.v.max()
+#         min_ = df.v.min()
+#         if norm == 'heatmap':
+#             overall = True
+#         else:
+#             gb = df.groupby(norm, group_keys=False)
+#             if len(gb) <= 1:
+#                 overall = True
+#             else:
+#                 df['perc'] = (
+#                     gb.apply(
+#                         lambda x: (x.v - x.v.min()) / (x.v.max() - x.v.min()))
+#                 )
+#                 df['rank'] = gb.apply(lambda x: x.v.rank(pct=True))
+#         if overall:
+#             df['perc'] = (df.v - min_) / (max_ - min_)
+#             df['rank'] = df.v.rank(pct=True)
+#         return {
+#             'records': df.to_dict(orient='records'),
+#             'extents': [min_, max_],
+#         }
+#
+#
+# class HorizonViz(NVD3TimeSeriesViz):
+#
+#     """Horizon chart
+#
+#     https://www.npmjs.com/package/d3-horizon-chart
+#     """
+#
+#     viz_type = 'horizon'
+#     verbose_name = _('Horizon Charts')
+#     credits = (
+#         '<a href="https://www.npmjs.com/package/d3-horizon-chart">'
+#         'd3-horizon-chart</a>')
 
 
 class MapboxViz(BaseViz):
