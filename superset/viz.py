@@ -2081,372 +2081,266 @@ class MapboxViz(BaseViz):
         }
 
 
-class DeckGLMultiLayer(BaseViz):
-
-    """Pile on multiple DeckGL layers"""
-
-    viz_type = 'deck_multi'
-    verbose_name = _('Deck.gl - Multiple Layers')
-
-    is_timeseries = False
-    credits = '<a href="https://uber.github.io/deck.gl/">deck.gl</a>'
-
-    def query_obj(self):
-        return None
-
-    def get_data(self, df):
-        fd = self.form_data
-        # Late imports to avoid circular import issues
-        from superset.models.core import Slice
-        from superset import db
-        slice_ids = fd.get('deck_slices')
-        slices = db.session.query(Slice).filter(Slice.id.in_(slice_ids)).all()
-        return {
-            'mapboxApiKey': config.get('MAPBOX_API_KEY'),
-            'slices': [slc.data for slc in slices],
-        }
-
-
-class BaseDeckGLViz(BaseViz):
-
-    """Base class for deck.gl visualizations"""
-
-    is_timeseries = False
-    credits = '<a href="https://uber.github.io/deck.gl/">deck.gl</a>'
-    spatial_control_keys = []
-
-    def get_metrics(self):
-        self.metric = self.form_data.get('size')
-        return [self.metric] if self.metric else []
-
-    def process_spatial_query_obj(self, key, group_by):
-        group_by.extend(self.get_spatial_columns(key))
-
-    def get_spatial_columns(self, key):
-        spatial = self.form_data.get(key)
-        if spatial is None:
-            raise ValueError(_('Bad spatial key'))
-
-        if spatial.get('type') == 'latlong':
-            return [spatial.get('lonCol'), spatial.get('latCol')]
-        elif spatial.get('type') == 'delimited':
-            return [spatial.get('lonlatCol')]
-        elif spatial.get('type') == 'geohash':
-            return [spatial.get('geohashCol')]
-
-    @staticmethod
-    def parse_coordinates(s):
-        if not s:
-            return None
-        try:
-            p = Point(s)
-            return (p.latitude, p.longitude)  # pylint: disable=no-member
-        except Exception:
-            raise SpatialException(
-                _('Invalid spatial point encountered: %s' % s))
-
-    @staticmethod
-    def reverse_geohash_decode(geohash_code):
-        lat, lng = geohash.decode(geohash_code)
-        return (lng, lat)
-
-    @staticmethod
-    def reverse_latlong(df, key):
-        df[key] = [
-            tuple(reversed(o))
-            for o in df[key]
-            if isinstance(o, (list, tuple))
-        ]
-
-    def process_spatial_data_obj(self, key, df):
-        spatial = self.form_data.get(key)
-        if spatial is None:
-            raise ValueError(_('Bad spatial key'))
-
-        if spatial.get('type') == 'latlong':
-            df[key] = list(zip(
-                pd.to_numeric(df[spatial.get('lonCol')], errors='coerce'),
-                pd.to_numeric(df[spatial.get('latCol')], errors='coerce'),
-            ))
-        elif spatial.get('type') == 'delimited':
-            lon_lat_col = spatial.get('lonlatCol')
-            df[key] = df[lon_lat_col].apply(self.parse_coordinates)
-            del df[lon_lat_col]
-        elif spatial.get('type') == 'geohash':
-            df[key] = df[spatial.get('geohashCol')].map(self.reverse_geohash_decode)
-            del df[spatial.get('geohashCol')]
-
-        if spatial.get('reverseCheckbox'):
-            self.reverse_latlong(df, key)
-
-        if df.get(key) is None:
-            raise NullValueException(_('Encountered invalid NULL spatial entry, \
-                                       please consider filtering those out'))
-        return df
-
-    def add_null_filters(self):
-        fd = self.form_data
-        spatial_columns = set()
-        for key in self.spatial_control_keys:
-            for column in self.get_spatial_columns(key):
-                spatial_columns.add(column)
-
-        if fd.get('adhoc_filters') is None:
-            fd['adhoc_filters'] = []
-
-        line_column = fd.get('line_column')
-        if line_column:
-            spatial_columns.add(line_column)
-
-        for column in sorted(spatial_columns):
-            filter_ = to_adhoc({
-                'col': column,
-                'op': 'IS NOT NULL',
-                'val': '',
-            })
-            fd['adhoc_filters'].append(filter_)
-
-    def query_obj(self):
-        fd = self.form_data
-
-        # add NULL filters
-        if fd.get('filter_nulls', True):
-            self.add_null_filters()
-
-        d = super().query_obj()
-        gb = []
-
-        for key in self.spatial_control_keys:
-            self.process_spatial_query_obj(key, gb)
-
-        if fd.get('dimension'):
-            gb += [fd.get('dimension')]
-
-        if fd.get('js_columns'):
-            gb += fd.get('js_columns')
-        metrics = self.get_metrics()
-        gb = list(set(gb))
-        if metrics:
-            d['groupby'] = gb
-            d['metrics'] = metrics
-            d['columns'] = []
-        else:
-            d['columns'] = gb
-        return d
-
-    def get_js_columns(self, d):
-        cols = self.form_data.get('js_columns') or []
-        return {col: d.get(col) for col in cols}
-
-    def get_data(self, df):
-        if df is None:
-            return None
-
-        # Processing spatial info
-        for key in self.spatial_control_keys:
-            df = self.process_spatial_data_obj(key, df)
-
-        features = []
-        for d in df.to_dict(orient='records'):
-            feature = self.get_properties(d)
-            extra_props = self.get_js_columns(d)
-            if extra_props:
-                feature['extraProps'] = extra_props
-            features.append(feature)
-
-        return {
-            'features': features,
-            'mapboxApiKey': config.get('MAPBOX_API_KEY'),
-            'metricLabels': self.metric_labels,
-        }
-
-    def get_properties(self, d):
-        raise NotImplementedError()
-
-
-class DeckScatterViz(BaseDeckGLViz):
-
-    """deck.gl's ScatterLayer"""
-
-    viz_type = 'deck_scatter'
-    verbose_name = _('Deck.gl - Scatter plot')
-    spatial_control_keys = ['spatial']
-    is_timeseries = True
-
-    def query_obj(self):
-        fd = self.form_data
-        self.is_timeseries = bool(
-            fd.get('time_grain_sqla') or fd.get('granularity'))
-        self.point_radius_fixed = (
-            fd.get('point_radius_fixed') or {'type': 'fix', 'value': 500})
-        return super().query_obj()
-
-    def get_metrics(self):
-        self.metric = None
-        if self.point_radius_fixed.get('type') == 'metric':
-            self.metric = self.point_radius_fixed.get('value')
-            return [self.metric]
-        return None
-
-    def get_properties(self, d):
-        return {
-            'metric': d.get(self.metric_label),
-            'radius': self.fixed_value if self.fixed_value else d.get(self.metric_label),
-            'cat_color': d.get(self.dim) if self.dim else None,
-            'position': d.get('spatial'),
-            DTTM_ALIAS: d.get(DTTM_ALIAS),
-        }
-
-    def get_data(self, df):
-        fd = self.form_data
-        self.metric_label = \
-            utils.get_metric_name(self.metric) if self.metric else None
-        self.point_radius_fixed = fd.get('point_radius_fixed')
-        self.fixed_value = None
-        self.dim = self.form_data.get('dimension')
-        if self.point_radius_fixed.get('type') != 'metric':
-            self.fixed_value = self.point_radius_fixed.get('value')
-        return super().get_data(df)
-
-
-class DeckScreengrid(BaseDeckGLViz):
-
-    """deck.gl's ScreenGridLayer"""
-
-    viz_type = 'deck_screengrid'
-    verbose_name = _('Deck.gl - Screen Grid')
-    spatial_control_keys = ['spatial']
-    is_timeseries = True
-
-    def query_obj(self):
-        fd = self.form_data
-        self.is_timeseries = fd.get('time_grain_sqla') or fd.get('granularity')
-        return super().query_obj()
-
-    def get_properties(self, d):
-        return {
-            'position': d.get('spatial'),
-            'weight': d.get(self.metric_label) or 1,
-            '__timestamp': d.get(DTTM_ALIAS) or d.get('__time'),
-        }
-
-    def get_data(self, df):
-        self.metric_label = utils.get_metric_name(self.metric)
-        return super().get_data(df)
-
-
-class DeckGrid(BaseDeckGLViz):
-
-    """deck.gl's DeckLayer"""
-
-    viz_type = 'deck_grid'
-    verbose_name = _('Deck.gl - 3D Grid')
-    spatial_control_keys = ['spatial']
-
-    def get_properties(self, d):
-        return {
-            'position': d.get('spatial'),
-            'weight': d.get(self.metric_label) or 1,
-        }
-
-    def get_data(self, df):
-        self.metric_label = utils.get_metric_name(self.metric)
-        return super().get_data(df)
-
-
-# def geohash_to_json(geohash_code):
-#     p = geohash.bbox(geohash_code)
-#     return [
-#         [p.get('w'), p.get('n')],
-#         [p.get('e'), p.get('n')],
-#         [p.get('e'), p.get('s')],
-#         [p.get('w'), p.get('s')],
-#         [p.get('w'), p.get('n')],
-#     ]
+# class DeckGLMultiLayer(BaseViz):
+#
+#     """Pile on multiple DeckGL layers"""
+#
+#     viz_type = 'deck_multi'
+#     verbose_name = _('Deck.gl - Multiple Layers')
+#
+#     is_timeseries = False
+#     credits = '<a href="https://uber.github.io/deck.gl/">deck.gl</a>'
+#
+#     def query_obj(self):
+#         return None
+#
+#     def get_data(self, df):
+#         fd = self.form_data
+#         # Late imports to avoid circular import issues
+#         from superset.models.core import Slice
+#         from superset import db
+#         slice_ids = fd.get('deck_slices')
+#         slices = db.session.query(Slice).filter(Slice.id.in_(slice_ids)).all()
+#         return {
+#             'mapboxApiKey': config.get('MAPBOX_API_KEY'),
+#             'slices': [slc.data for slc in slices],
+#         }
 #
 #
-# class DeckPathViz(BaseDeckGLViz):
+# class BaseDeckGLViz(BaseViz):
 #
-#     """deck.gl's PathLayer"""
+#     """Base class for deck.gl visualizations"""
 #
-#     viz_type = 'deck_path'
-#     verbose_name = _('Deck.gl - Paths')
-#     deck_viz_key = 'path'
+#     is_timeseries = False
+#     credits = '<a href="https://uber.github.io/deck.gl/">deck.gl</a>'
+#     spatial_control_keys = []
+#
+#     def get_metrics(self):
+#         self.metric = self.form_data.get('size')
+#         return [self.metric] if self.metric else []
+#
+#     def process_spatial_query_obj(self, key, group_by):
+#         group_by.extend(self.get_spatial_columns(key))
+#
+#     def get_spatial_columns(self, key):
+#         spatial = self.form_data.get(key)
+#         if spatial is None:
+#             raise ValueError(_('Bad spatial key'))
+#
+#         if spatial.get('type') == 'latlong':
+#             return [spatial.get('lonCol'), spatial.get('latCol')]
+#         elif spatial.get('type') == 'delimited':
+#             return [spatial.get('lonlatCol')]
+#         elif spatial.get('type') == 'geohash':
+#             return [spatial.get('geohashCol')]
+#
+#     @staticmethod
+#     def parse_coordinates(s):
+#         if not s:
+#             return None
+#         try:
+#             p = Point(s)
+#             return (p.latitude, p.longitude)  # pylint: disable=no-member
+#         except Exception:
+#             raise SpatialException(
+#                 _('Invalid spatial point encountered: %s' % s))
+#
+#     @staticmethod
+#     def reverse_geohash_decode(geohash_code):
+#         lat, lng = geohash.decode(geohash_code)
+#         return (lng, lat)
+#
+#     @staticmethod
+#     def reverse_latlong(df, key):
+#         df[key] = [
+#             tuple(reversed(o))
+#             for o in df[key]
+#             if isinstance(o, (list, tuple))
+#         ]
+#
+#     def process_spatial_data_obj(self, key, df):
+#         spatial = self.form_data.get(key)
+#         if spatial is None:
+#             raise ValueError(_('Bad spatial key'))
+#
+#         if spatial.get('type') == 'latlong':
+#             df[key] = list(zip(
+#                 pd.to_numeric(df[spatial.get('lonCol')], errors='coerce'),
+#                 pd.to_numeric(df[spatial.get('latCol')], errors='coerce'),
+#             ))
+#         elif spatial.get('type') == 'delimited':
+#             lon_lat_col = spatial.get('lonlatCol')
+#             df[key] = df[lon_lat_col].apply(self.parse_coordinates)
+#             del df[lon_lat_col]
+#         elif spatial.get('type') == 'geohash':
+#             df[key] = df[spatial.get('geohashCol')].map(self.reverse_geohash_decode)
+#             del df[spatial.get('geohashCol')]
+#
+#         if spatial.get('reverseCheckbox'):
+#             self.reverse_latlong(df, key)
+#
+#         if df.get(key) is None:
+#             raise NullValueException(_('Encountered invalid NULL spatial entry, \
+#                                        please consider filtering those out'))
+#         return df
+#
+#     def add_null_filters(self):
+#         fd = self.form_data
+#         spatial_columns = set()
+#         for key in self.spatial_control_keys:
+#             for column in self.get_spatial_columns(key):
+#                 spatial_columns.add(column)
+#
+#         if fd.get('adhoc_filters') is None:
+#             fd['adhoc_filters'] = []
+#
+#         line_column = fd.get('line_column')
+#         if line_column:
+#             spatial_columns.add(line_column)
+#
+#         for column in sorted(spatial_columns):
+#             filter_ = to_adhoc({
+#                 'col': column,
+#                 'op': 'IS NOT NULL',
+#                 'val': '',
+#             })
+#             fd['adhoc_filters'].append(filter_)
+#
+#     def query_obj(self):
+#         fd = self.form_data
+#
+#         # add NULL filters
+#         if fd.get('filter_nulls', True):
+#             self.add_null_filters()
+#
+#         d = super().query_obj()
+#         gb = []
+#
+#         for key in self.spatial_control_keys:
+#             self.process_spatial_query_obj(key, gb)
+#
+#         if fd.get('dimension'):
+#             gb += [fd.get('dimension')]
+#
+#         if fd.get('js_columns'):
+#             gb += fd.get('js_columns')
+#         metrics = self.get_metrics()
+#         gb = list(set(gb))
+#         if metrics:
+#             d['groupby'] = gb
+#             d['metrics'] = metrics
+#             d['columns'] = []
+#         else:
+#             d['columns'] = gb
+#         return d
+#
+#     def get_js_columns(self, d):
+#         cols = self.form_data.get('js_columns') or []
+#         return {col: d.get(col) for col in cols}
+#
+#     def get_data(self, df):
+#         if df is None:
+#             return None
+#
+#         # Processing spatial info
+#         for key in self.spatial_control_keys:
+#             df = self.process_spatial_data_obj(key, df)
+#
+#         features = []
+#         for d in df.to_dict(orient='records'):
+#             feature = self.get_properties(d)
+#             extra_props = self.get_js_columns(d)
+#             if extra_props:
+#                 feature['extraProps'] = extra_props
+#             features.append(feature)
+#
+#         return {
+#             'features': features,
+#             'mapboxApiKey': config.get('MAPBOX_API_KEY'),
+#             'metricLabels': self.metric_labels,
+#         }
+#
+#     def get_properties(self, d):
+#         raise NotImplementedError()
+#
+#
+# class DeckScatterViz(BaseDeckGLViz):
+#
+#     """deck.gl's ScatterLayer"""
+#
+#     viz_type = 'deck_scatter'
+#     verbose_name = _('Deck.gl - Scatter plot')
+#     spatial_control_keys = ['spatial']
 #     is_timeseries = True
-#     deser_map = {
-#         'json': json.loads,
-#         'polyline': polyline.decode,
-#         'geohash': geohash_to_json,
-#     }
+#
+#     def query_obj(self):
+#         fd = self.form_data
+#         self.is_timeseries = bool(
+#             fd.get('time_grain_sqla') or fd.get('granularity'))
+#         self.point_radius_fixed = (
+#             fd.get('point_radius_fixed') or {'type': 'fix', 'value': 500})
+#         return super().query_obj()
+#
+#     def get_metrics(self):
+#         self.metric = None
+#         if self.point_radius_fixed.get('type') == 'metric':
+#             self.metric = self.point_radius_fixed.get('value')
+#             return [self.metric]
+#         return None
+#
+#     def get_properties(self, d):
+#         return {
+#             'metric': d.get(self.metric_label),
+#             'radius': self.fixed_value if self.fixed_value else d.get(self.metric_label),
+#             'cat_color': d.get(self.dim) if self.dim else None,
+#             'position': d.get('spatial'),
+#             DTTM_ALIAS: d.get(DTTM_ALIAS),
+#         }
+#
+#     def get_data(self, df):
+#         fd = self.form_data
+#         self.metric_label = \
+#             utils.get_metric_name(self.metric) if self.metric else None
+#         self.point_radius_fixed = fd.get('point_radius_fixed')
+#         self.fixed_value = None
+#         self.dim = self.form_data.get('dimension')
+#         if self.point_radius_fixed.get('type') != 'metric':
+#             self.fixed_value = self.point_radius_fixed.get('value')
+#         return super().get_data(df)
+#
+#
+# class DeckScreengrid(BaseDeckGLViz):
+#
+#     """deck.gl's ScreenGridLayer"""
+#
+#     viz_type = 'deck_screengrid'
+#     verbose_name = _('Deck.gl - Screen Grid')
+#     spatial_control_keys = ['spatial']
+#     is_timeseries = True
 #
 #     def query_obj(self):
 #         fd = self.form_data
 #         self.is_timeseries = fd.get('time_grain_sqla') or fd.get('granularity')
-#         d = super().query_obj()
-#         self.metric = fd.get('metric')
-#         line_col = fd.get('line_column')
-#         if d['metrics']:
-#             self.has_metrics = True
-#             d['groupby'].append(line_col)
-#         else:
-#             self.has_metrics = False
-#             d['columns'].append(line_col)
-#         return d
+#         return super().query_obj()
 #
 #     def get_properties(self, d):
-#         fd = self.form_data
-#         line_type = fd.get('line_type')
-#         deser = self.deser_map[line_type]
-#         line_column = fd.get('line_column')
-#         path = deser(d[line_column])
-#         if fd.get('reverse_long_lat'):
-#             path = [(o[1], o[0]) for o in path]
-#         d[self.deck_viz_key] = path
-#         if line_type != 'geohash':
-#             del d[line_column]
-#         d['__timestamp'] = d.get(DTTM_ALIAS) or d.get('__time')
-#         return d
+#         return {
+#             'position': d.get('spatial'),
+#             'weight': d.get(self.metric_label) or 1,
+#             '__timestamp': d.get(DTTM_ALIAS) or d.get('__time'),
+#         }
 #
 #     def get_data(self, df):
 #         self.metric_label = utils.get_metric_name(self.metric)
 #         return super().get_data(df)
 #
 #
-# class DeckPolygon(DeckPathViz):
-#
-#     """deck.gl's Polygon Layer"""
-#
-#     viz_type = 'deck_polygon'
-#     deck_viz_key = 'polygon'
-#     verbose_name = _('Deck.gl - Polygon')
-#
-#     def query_obj(self):
-#         fd = self.form_data
-#         self.elevation = (
-#             fd.get('point_radius_fixed') or {'type': 'fix', 'value': 500})
-#         return super().query_obj()
-#
-#     def get_metrics(self):
-#         metrics = [self.form_data.get('metric')]
-#         if self.elevation.get('type') == 'metric':
-#             metrics.append(self.elevation.get('value'))
-#         return [metric for metric in metrics if metric]
-#
-#     def get_properties(self, d):
-#         super().get_properties(d)
-#         fd = self.form_data
-#         elevation = fd['point_radius_fixed']['value']
-#         type_ = fd['point_radius_fixed']['type']
-#         d['elevation'] = d.get(elevation) if type_ == 'metric' else elevation
-#         return d
-#
-#
-# class DeckHex(BaseDeckGLViz):
+# class DeckGrid(BaseDeckGLViz):
 #
 #     """deck.gl's DeckLayer"""
 #
-#     viz_type = 'deck_hex'
-#     verbose_name = _('Deck.gl - 3D HEX')
+#     viz_type = 'deck_grid'
+#     verbose_name = _('Deck.gl - 3D Grid')
 #     spatial_control_keys = ['spatial']
 #
 #     def get_properties(self, d):
@@ -2457,317 +2351,423 @@ class DeckGrid(BaseDeckGLViz):
 #
 #     def get_data(self, df):
 #         self.metric_label = utils.get_metric_name(self.metric)
-#         return super(DeckHex, self).get_data(df)
+#         return super().get_data(df)
 #
 #
-# class DeckGeoJson(BaseDeckGLViz):
-#
-#     """deck.gl's GeoJSONLayer"""
-#
-#     viz_type = 'deck_geojson'
-#     verbose_name = _('Deck.gl - GeoJSON')
-#
-#     def query_obj(self):
-#         d = super().query_obj()
-#         d['columns'] += [self.form_data.get('geojson')]
-#         d['metrics'] = []
-#         d['groupby'] = []
-#         return d
-#
-#     def get_properties(self, d):
-#         geojson = d.get(self.form_data.get('geojson'))
-#         return json.loads(geojson)
-#
-#
-# class DeckArc(BaseDeckGLViz):
-#
-#     """deck.gl's Arc Layer"""
-#
-#     viz_type = 'deck_arc'
-#     verbose_name = _('Deck.gl - Arc')
-#     spatial_control_keys = ['start_spatial', 'end_spatial']
-#     is_timeseries = True
-#
-#     def query_obj(self):
-#         fd = self.form_data
-#         self.is_timeseries = bool(
-#             fd.get('time_grain_sqla') or fd.get('granularity'))
-#         return super().query_obj()
-#
-#     def get_properties(self, d):
-#         dim = self.form_data.get('dimension')
-#         return {
-#             'sourcePosition': d.get('start_spatial'),
-#             'targetPosition': d.get('end_spatial'),
-#             'cat_color': d.get(dim) if dim else None,
-#             DTTM_ALIAS: d.get(DTTM_ALIAS),
-#         }
-#
-#     def get_data(self, df):
-#         d = super().get_data(df)
-#
-#         return {
-#             'features': d['features'],
-#             'mapboxApiKey': config.get('MAPBOX_API_KEY'),
-#         }
-#
-#
-# class EventFlowViz(BaseViz):
-#
-#     """A visualization to explore patterns in event sequences"""
-#
-#     viz_type = 'event_flow'
-#     verbose_name = _('Event flow')
-#     credits = 'from <a href="https://github.com/williaster/data-ui">@data-ui</a>'
-#     is_timeseries = True
-#
-#     def query_obj(self):
-#         query = super().query_obj()
-#         form_data = self.form_data
-#
-#         event_key = form_data.get('all_columns_x')
-#         entity_key = form_data.get('entity')
-#         meta_keys = [
-#             col for col in form_data.get('all_columns')
-#             if col != event_key and col != entity_key
-#         ]
-#
-#         query['columns'] = [event_key, entity_key] + meta_keys
-#
-#         if form_data['order_by_entity']:
-#             query['orderby'] = [(entity_key, True)]
-#
-#         return query
-#
-#     def get_data(self, df):
-#         return df.to_dict(orient='records')
-#
-#
-# class PairedTTestViz(BaseViz):
-#
-#     """A table displaying paired t-test values"""
-#
-#     viz_type = 'paired_ttest'
-#     verbose_name = _('Time Series - Paired t-test')
-#     sort_series = False
-#     is_timeseries = True
-#
-#     def get_data(self, df):
-#         """
-#         Transform received data frame into an object of the form:
-#         {
-#             'metric1': [
-#                 {
-#                     groups: ('groupA', ... ),
-#                     values: [ {x, y}, ... ],
-#                 }, ...
-#             ], ...
-#         }
-#         """
-#         fd = self.form_data
-#         groups = fd.get('groupby')
-#         metrics = self.metric_labels
-#         df = df.pivot_table(
-#             index=DTTM_ALIAS,
-#             columns=groups,
-#             values=metrics,
-#         )
-#         cols = []
-#         # Be rid of falsey keys
-#         for col in df.columns:
-#             if col == '':
-#                 cols.append('N/A')
-#             elif col is None:
-#                 cols.append('NULL')
-#             else:
-#                 cols.append(col)
-#         df.columns = cols
-#         data = {}
-#         series = df.to_dict('series')
-#         for nameSet in df.columns:
-#             # If no groups are defined, nameSet will be the metric name
-#             hasGroup = not isinstance(nameSet, str)
-#             Y = series[nameSet]
-#             d = {
-#                 'group': nameSet[1:] if hasGroup else 'All',
-#                 'values': [
-#                     {'x': t, 'y': Y[t] if t in Y else None}
-#                     for t in df.index
-#                 ],
-#             }
-#             key = nameSet[0] if hasGroup else nameSet
-#             if key in data:
-#                 data[key].append(d)
-#             else:
-#                 data[key] = [d]
-#         return data
-#
-#
-# class RoseViz(NVD3TimeSeriesViz):
-#
-#     viz_type = 'rose'
-#     verbose_name = _('Time Series - Nightingale Rose Chart')
-#     sort_series = False
-#     is_timeseries = True
-#
-#     def get_data(self, df):
-#         data = super().get_data(df)
-#         result = {}
-#         for datum in data:
-#             key = datum['key']
-#             for val in datum['values']:
-#                 timestamp = val['x'].value
-#                 if not result.get(timestamp):
-#                     result[timestamp] = []
-#                 value = 0 if math.isnan(val['y']) else val['y']
-#                 result[timestamp].append({
-#                     'key': key,
-#                     'value': value,
-#                     'name': ', '.join(key) if isinstance(key, list) else key,
-#                     'time': val['x'],
-#                 })
-#         return result
-#
-#
-# class PartitionViz(NVD3TimeSeriesViz):
-#
-#     """
-#     A hierarchical data visualization with support for time series.
-#     """
-#
-#     viz_type = 'partition'
-#     verbose_name = _('Partition Diagram')
-#
-#     def query_obj(self):
-#         query_obj = super().query_obj()
-#         time_op = self.form_data.get('time_series_option', 'not_time')
-#         # Return time series data if the user specifies so
-#         query_obj['is_timeseries'] = time_op != 'not_time'
-#         return query_obj
-#
-#     def levels_for(self, time_op, groups, df):
-#         """
-#         Compute the partition at each `level` from the dataframe.
-#         """
-#         levels = {}
-#         for i in range(0, len(groups) + 1):
-#             agg_df = df.groupby(groups[:i]) if i else df
-#             levels[i] = (
-#                 agg_df.mean() if time_op == 'agg_mean'
-#                 else agg_df.sum(numeric_only=True))
-#         return levels
-#
-#     def levels_for_diff(self, time_op, groups, df):
-#         # Obtain a unique list of the time grains
-#         times = list(set(df[DTTM_ALIAS]))
-#         times.sort()
-#         until = times[len(times) - 1]
-#         since = times[0]
-#         # Function describing how to calculate the difference
-#         func = {
-#             'point_diff': [
-#                 pd.Series.sub,
-#                 lambda a, b, fill_value: a - b,
-#             ],
-#             'point_factor': [
-#                 pd.Series.div,
-#                 lambda a, b, fill_value: a / float(b),
-#             ],
-#             'point_percent': [
-#                 lambda a, b, fill_value=0: a.div(b, fill_value=fill_value) - 1,
-#                 lambda a, b, fill_value: a / float(b) - 1,
-#             ],
-#         }[time_op]
-#         agg_df = df.groupby(DTTM_ALIAS).sum()
-#         levels = {0: pd.Series({
-#             m: func[1](agg_df[m][until], agg_df[m][since], 0)
-#             for m in agg_df.columns})}
-#         for i in range(1, len(groups) + 1):
-#             agg_df = df.groupby([DTTM_ALIAS] + groups[:i]).sum()
-#             levels[i] = pd.DataFrame({
-#                 m: func[0](agg_df[m][until], agg_df[m][since], fill_value=0)
-#                 for m in agg_df.columns})
-#         return levels
-#
-#     def levels_for_time(self, groups, df):
-#         procs = {}
-#         for i in range(0, len(groups) + 1):
-#             self.form_data['groupby'] = groups[:i]
-#             df_drop = df.drop(groups[i:], 1)
-#             procs[i] = self.process_data(df_drop, aggregate=True)
-#         self.form_data['groupby'] = groups
-#         return procs
-#
-#     def nest_values(self, levels, level=0, metric=None, dims=()):
-#         """
-#         Nest values at each level on the back-end with
-#         access and setting, instead of summing from the bottom.
-#         """
-#         if not level:
-#             return [{
-#                 'name': m,
-#                 'val': levels[0][m],
-#                 'children': self.nest_values(levels, 1, m),
-#             } for m in levels[0].index]
-#         if level == 1:
-#             return [{
-#                 'name': i,
-#                 'val': levels[1][metric][i],
-#                 'children': self.nest_values(levels, 2, metric, (i,)),
-#             } for i in levels[1][metric].index]
-#         if level >= len(levels):
-#             return []
-#         return [{
-#             'name': i,
-#             'val': levels[level][metric][dims][i],
-#             'children': self.nest_values(
-#                 levels, level + 1, metric, dims + (i,),
-#             ),
-#         } for i in levels[level][metric][dims].index]
-#
-#     def nest_procs(self, procs, level=-1, dims=(), time=None):
-#         if level == -1:
-#             return [{
-#                 'name': m,
-#                 'children': self.nest_procs(procs, 0, (m,)),
-#             } for m in procs[0].columns]
-#         if not level:
-#             return [{
-#                 'name': t,
-#                 'val': procs[0][dims[0]][t],
-#                 'children': self.nest_procs(procs, 1, dims, t),
-#             } for t in procs[0].index]
-#         if level >= len(procs):
-#             return []
-#         return [{
-#             'name': i,
-#             'val': procs[level][dims][i][time],
-#             'children': self.nest_procs(procs, level + 1, dims + (i,), time),
-#         } for i in procs[level][dims].columns]
-#
-#     def get_data(self, df):
-#         fd = self.form_data
-#         groups = fd.get('groupby', [])
-#         time_op = fd.get('time_series_option', 'not_time')
-#         if not len(groups):
-#             raise ValueError('Please choose at least one groupby')
-#         if time_op == 'not_time':
-#             levels = self.levels_for('agg_sum', groups, df)
-#         elif time_op in ['agg_sum', 'agg_mean']:
-#             levels = self.levels_for(time_op, groups, df)
-#         elif time_op in ['point_diff', 'point_factor', 'point_percent']:
-#             levels = self.levels_for_diff(time_op, groups, df)
-#         elif time_op == 'adv_anal':
-#             procs = self.levels_for_time(groups, df)
-#             return self.nest_procs(procs)
-#         else:
-#             levels = self.levels_for('agg_sum', [DTTM_ALIAS] + groups, df)
-#         return self.nest_values(levels)
-#
-#
-# viz_types = {
-#     o.viz_type: o for o in globals().values()
-#     if (
-#         inspect.isclass(o) and
-#         issubclass(o, BaseViz) and
-#         o.viz_type not in config.get('VIZ_TYPE_BLACKLIST'))}
+# def geohash_to_json(geohash_code):
+#     p = geohash.bbox(geohash_code)
+#     return [
+#         [p.get('w'), p.get('n')],
+#         [p.get('e'), p.get('n')],
+#         [p.get('e'), p.get('s')],
+#         [p.get('w'), p.get('s')],
+#         [p.get('w'), p.get('n')],
+#     ]
+
+
+class DeckPathViz(BaseDeckGLViz):
+
+    """deck.gl's PathLayer"""
+
+    viz_type = 'deck_path'
+    verbose_name = _('Deck.gl - Paths')
+    deck_viz_key = 'path'
+    is_timeseries = True
+    deser_map = {
+        'json': json.loads,
+        'polyline': polyline.decode,
+        'geohash': geohash_to_json,
+    }
+
+    def query_obj(self):
+        fd = self.form_data
+        self.is_timeseries = fd.get('time_grain_sqla') or fd.get('granularity')
+        d = super().query_obj()
+        self.metric = fd.get('metric')
+        line_col = fd.get('line_column')
+        if d['metrics']:
+            self.has_metrics = True
+            d['groupby'].append(line_col)
+        else:
+            self.has_metrics = False
+            d['columns'].append(line_col)
+        return d
+
+    def get_properties(self, d):
+        fd = self.form_data
+        line_type = fd.get('line_type')
+        deser = self.deser_map[line_type]
+        line_column = fd.get('line_column')
+        path = deser(d[line_column])
+        if fd.get('reverse_long_lat'):
+            path = [(o[1], o[0]) for o in path]
+        d[self.deck_viz_key] = path
+        if line_type != 'geohash':
+            del d[line_column]
+        d['__timestamp'] = d.get(DTTM_ALIAS) or d.get('__time')
+        return d
+
+    def get_data(self, df):
+        self.metric_label = utils.get_metric_name(self.metric)
+        return super().get_data(df)
+
+
+class DeckPolygon(DeckPathViz):
+
+    """deck.gl's Polygon Layer"""
+
+    viz_type = 'deck_polygon'
+    deck_viz_key = 'polygon'
+    verbose_name = _('Deck.gl - Polygon')
+
+    def query_obj(self):
+        fd = self.form_data
+        self.elevation = (
+            fd.get('point_radius_fixed') or {'type': 'fix', 'value': 500})
+        return super().query_obj()
+
+    def get_metrics(self):
+        metrics = [self.form_data.get('metric')]
+        if self.elevation.get('type') == 'metric':
+            metrics.append(self.elevation.get('value'))
+        return [metric for metric in metrics if metric]
+
+    def get_properties(self, d):
+        super().get_properties(d)
+        fd = self.form_data
+        elevation = fd['point_radius_fixed']['value']
+        type_ = fd['point_radius_fixed']['type']
+        d['elevation'] = d.get(elevation) if type_ == 'metric' else elevation
+        return d
+
+
+class DeckHex(BaseDeckGLViz):
+
+    """deck.gl's DeckLayer"""
+
+    viz_type = 'deck_hex'
+    verbose_name = _('Deck.gl - 3D HEX')
+    spatial_control_keys = ['spatial']
+
+    def get_properties(self, d):
+        return {
+            'position': d.get('spatial'),
+            'weight': d.get(self.metric_label) or 1,
+        }
+
+    def get_data(self, df):
+        self.metric_label = utils.get_metric_name(self.metric)
+        return super(DeckHex, self).get_data(df)
+
+
+class DeckGeoJson(BaseDeckGLViz):
+
+    """deck.gl's GeoJSONLayer"""
+
+    viz_type = 'deck_geojson'
+    verbose_name = _('Deck.gl - GeoJSON')
+
+    def query_obj(self):
+        d = super().query_obj()
+        d['columns'] += [self.form_data.get('geojson')]
+        d['metrics'] = []
+        d['groupby'] = []
+        return d
+
+    def get_properties(self, d):
+        geojson = d.get(self.form_data.get('geojson'))
+        return json.loads(geojson)
+
+
+class DeckArc(BaseDeckGLViz):
+
+    """deck.gl's Arc Layer"""
+
+    viz_type = 'deck_arc'
+    verbose_name = _('Deck.gl - Arc')
+    spatial_control_keys = ['start_spatial', 'end_spatial']
+    is_timeseries = True
+
+    def query_obj(self):
+        fd = self.form_data
+        self.is_timeseries = bool(
+            fd.get('time_grain_sqla') or fd.get('granularity'))
+        return super().query_obj()
+
+    def get_properties(self, d):
+        dim = self.form_data.get('dimension')
+        return {
+            'sourcePosition': d.get('start_spatial'),
+            'targetPosition': d.get('end_spatial'),
+            'cat_color': d.get(dim) if dim else None,
+            DTTM_ALIAS: d.get(DTTM_ALIAS),
+        }
+
+    def get_data(self, df):
+        d = super().get_data(df)
+
+        return {
+            'features': d['features'],
+            'mapboxApiKey': config.get('MAPBOX_API_KEY'),
+        }
+
+
+class EventFlowViz(BaseViz):
+
+    """A visualization to explore patterns in event sequences"""
+
+    viz_type = 'event_flow'
+    verbose_name = _('Event flow')
+    credits = 'from <a href="https://github.com/williaster/data-ui">@data-ui</a>'
+    is_timeseries = True
+
+    def query_obj(self):
+        query = super().query_obj()
+        form_data = self.form_data
+
+        event_key = form_data.get('all_columns_x')
+        entity_key = form_data.get('entity')
+        meta_keys = [
+            col for col in form_data.get('all_columns')
+            if col != event_key and col != entity_key
+        ]
+
+        query['columns'] = [event_key, entity_key] + meta_keys
+
+        if form_data['order_by_entity']:
+            query['orderby'] = [(entity_key, True)]
+
+        return query
+
+    def get_data(self, df):
+        return df.to_dict(orient='records')
+
+
+class PairedTTestViz(BaseViz):
+
+    """A table displaying paired t-test values"""
+
+    viz_type = 'paired_ttest'
+    verbose_name = _('Time Series - Paired t-test')
+    sort_series = False
+    is_timeseries = True
+
+    def get_data(self, df):
+        """
+        Transform received data frame into an object of the form:
+        {
+            'metric1': [
+                {
+                    groups: ('groupA', ... ),
+                    values: [ {x, y}, ... ],
+                }, ...
+            ], ...
+        }
+        """
+        fd = self.form_data
+        groups = fd.get('groupby')
+        metrics = self.metric_labels
+        df = df.pivot_table(
+            index=DTTM_ALIAS,
+            columns=groups,
+            values=metrics,
+        )
+        cols = []
+        # Be rid of falsey keys
+        for col in df.columns:
+            if col == '':
+                cols.append('N/A')
+            elif col is None:
+                cols.append('NULL')
+            else:
+                cols.append(col)
+        df.columns = cols
+        data = {}
+        series = df.to_dict('series')
+        for nameSet in df.columns:
+            # If no groups are defined, nameSet will be the metric name
+            hasGroup = not isinstance(nameSet, str)
+            Y = series[nameSet]
+            d = {
+                'group': nameSet[1:] if hasGroup else 'All',
+                'values': [
+                    {'x': t, 'y': Y[t] if t in Y else None}
+                    for t in df.index
+                ],
+            }
+            key = nameSet[0] if hasGroup else nameSet
+            if key in data:
+                data[key].append(d)
+            else:
+                data[key] = [d]
+        return data
+
+
+class RoseViz(NVD3TimeSeriesViz):
+
+    viz_type = 'rose'
+    verbose_name = _('Time Series - Nightingale Rose Chart')
+    sort_series = False
+    is_timeseries = True
+
+    def get_data(self, df):
+        data = super().get_data(df)
+        result = {}
+        for datum in data:
+            key = datum['key']
+            for val in datum['values']:
+                timestamp = val['x'].value
+                if not result.get(timestamp):
+                    result[timestamp] = []
+                value = 0 if math.isnan(val['y']) else val['y']
+                result[timestamp].append({
+                    'key': key,
+                    'value': value,
+                    'name': ', '.join(key) if isinstance(key, list) else key,
+                    'time': val['x'],
+                })
+        return result
+
+
+class PartitionViz(NVD3TimeSeriesViz):
+
+    """
+    A hierarchical data visualization with support for time series.
+    """
+
+    viz_type = 'partition'
+    verbose_name = _('Partition Diagram')
+
+    def query_obj(self):
+        query_obj = super().query_obj()
+        time_op = self.form_data.get('time_series_option', 'not_time')
+        # Return time series data if the user specifies so
+        query_obj['is_timeseries'] = time_op != 'not_time'
+        return query_obj
+
+    def levels_for(self, time_op, groups, df):
+        """
+        Compute the partition at each `level` from the dataframe.
+        """
+        levels = {}
+        for i in range(0, len(groups) + 1):
+            agg_df = df.groupby(groups[:i]) if i else df
+            levels[i] = (
+                agg_df.mean() if time_op == 'agg_mean'
+                else agg_df.sum(numeric_only=True))
+        return levels
+
+    def levels_for_diff(self, time_op, groups, df):
+        # Obtain a unique list of the time grains
+        times = list(set(df[DTTM_ALIAS]))
+        times.sort()
+        until = times[len(times) - 1]
+        since = times[0]
+        # Function describing how to calculate the difference
+        func = {
+            'point_diff': [
+                pd.Series.sub,
+                lambda a, b, fill_value: a - b,
+            ],
+            'point_factor': [
+                pd.Series.div,
+                lambda a, b, fill_value: a / float(b),
+            ],
+            'point_percent': [
+                lambda a, b, fill_value=0: a.div(b, fill_value=fill_value) - 1,
+                lambda a, b, fill_value: a / float(b) - 1,
+            ],
+        }[time_op]
+        agg_df = df.groupby(DTTM_ALIAS).sum()
+        levels = {0: pd.Series({
+            m: func[1](agg_df[m][until], agg_df[m][since], 0)
+            for m in agg_df.columns})}
+        for i in range(1, len(groups) + 1):
+            agg_df = df.groupby([DTTM_ALIAS] + groups[:i]).sum()
+            levels[i] = pd.DataFrame({
+                m: func[0](agg_df[m][until], agg_df[m][since], fill_value=0)
+                for m in agg_df.columns})
+        return levels
+
+    def levels_for_time(self, groups, df):
+        procs = {}
+        for i in range(0, len(groups) + 1):
+            self.form_data['groupby'] = groups[:i]
+            df_drop = df.drop(groups[i:], 1)
+            procs[i] = self.process_data(df_drop, aggregate=True)
+        self.form_data['groupby'] = groups
+        return procs
+
+    def nest_values(self, levels, level=0, metric=None, dims=()):
+        """
+        Nest values at each level on the back-end with
+        access and setting, instead of summing from the bottom.
+        """
+        if not level:
+            return [{
+                'name': m,
+                'val': levels[0][m],
+                'children': self.nest_values(levels, 1, m),
+            } for m in levels[0].index]
+        if level == 1:
+            return [{
+                'name': i,
+                'val': levels[1][metric][i],
+                'children': self.nest_values(levels, 2, metric, (i,)),
+            } for i in levels[1][metric].index]
+        if level >= len(levels):
+            return []
+        return [{
+            'name': i,
+            'val': levels[level][metric][dims][i],
+            'children': self.nest_values(
+                levels, level + 1, metric, dims + (i,),
+            ),
+        } for i in levels[level][metric][dims].index]
+
+    def nest_procs(self, procs, level=-1, dims=(), time=None):
+        if level == -1:
+            return [{
+                'name': m,
+                'children': self.nest_procs(procs, 0, (m,)),
+            } for m in procs[0].columns]
+        if not level:
+            return [{
+                'name': t,
+                'val': procs[0][dims[0]][t],
+                'children': self.nest_procs(procs, 1, dims, t),
+            } for t in procs[0].index]
+        if level >= len(procs):
+            return []
+        return [{
+            'name': i,
+            'val': procs[level][dims][i][time],
+            'children': self.nest_procs(procs, level + 1, dims + (i,), time),
+        } for i in procs[level][dims].columns]
+
+    def get_data(self, df):
+        fd = self.form_data
+        groups = fd.get('groupby', [])
+        time_op = fd.get('time_series_option', 'not_time')
+        if not len(groups):
+            raise ValueError('Please choose at least one groupby')
+        if time_op == 'not_time':
+            levels = self.levels_for('agg_sum', groups, df)
+        elif time_op in ['agg_sum', 'agg_mean']:
+            levels = self.levels_for(time_op, groups, df)
+        elif time_op in ['point_diff', 'point_factor', 'point_percent']:
+            levels = self.levels_for_diff(time_op, groups, df)
+        elif time_op == 'adv_anal':
+            procs = self.levels_for_time(groups, df)
+            return self.nest_procs(procs)
+        else:
+            levels = self.levels_for('agg_sum', [DTTM_ALIAS] + groups, df)
+        return self.nest_values(levels)
+
+
+viz_types = {
+    o.viz_type: o for o in globals().values()
+    if (
+        inspect.isclass(o) and
+        issubclass(o, BaseViz) and
+        o.viz_type not in config.get('VIZ_TYPE_BLACKLIST'))}
