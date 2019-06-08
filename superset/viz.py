@@ -1964,394 +1964,394 @@ class HorizonViz(NVD3TimeSeriesViz):
         'd3-horizon-chart</a>')
 
 
-class MapboxViz(BaseViz):
-
-    """Rich maps made with Mapbox"""
-
-    viz_type = 'mapbox'
-    verbose_name = _('Mapbox')
-    is_timeseries = False
-    credits = (
-        '<a href=https://www.mapbox.com/mapbox-gl-js/api/>Mapbox GL JS</a>')
-
-    def query_obj(self):
-        d = super().query_obj()
-        fd = self.form_data
-        label_col = fd.get('mapbox_label')
-
-        if not fd.get('groupby'):
-            if fd.get('all_columns_x') is None or fd.get('all_columns_y') is None:
-                raise Exception(_('[Longitude] and [Latitude] must be set'))
-            d['columns'] = [fd.get('all_columns_x'), fd.get('all_columns_y')]
-
-            if label_col and len(label_col) >= 1:
-                if label_col[0] == 'count':
-                    raise Exception(_(
-                        "Must have a [Group By] column to have 'count' as the [Label]"))
-                d['columns'].append(label_col[0])
-
-            if fd.get('point_radius') != 'Auto':
-                d['columns'].append(fd.get('point_radius'))
-
-            d['columns'] = list(set(d['columns']))
-        else:
-            # Ensuring columns chosen are all in group by
-            if (label_col and len(label_col) >= 1 and
-                    label_col[0] != 'count' and
-                    label_col[0] not in fd.get('groupby')):
-                raise Exception(_(
-                    'Choice of [Label] must be present in [Group By]'))
-
-            if (fd.get('point_radius') != 'Auto' and
-                    fd.get('point_radius') not in fd.get('groupby')):
-                raise Exception(_(
-                    'Choice of [Point Radius] must be present in [Group By]'))
-
-            if (fd.get('all_columns_x') not in fd.get('groupby') or
-                    fd.get('all_columns_y') not in fd.get('groupby')):
-                raise Exception(_(
-                    '[Longitude] and [Latitude] columns must be present in [Group By]'))
-        return d
-
-    def get_data(self, df):
-        if df is None:
-            return None
-        fd = self.form_data
-        label_col = fd.get('mapbox_label')
-        has_custom_metric = label_col is not None and len(label_col) > 0
-        metric_col = [None] * len(df.index)
-        if has_custom_metric:
-            if label_col[0] == fd.get('all_columns_x'):
-                metric_col = df[fd.get('all_columns_x')]
-            elif label_col[0] == fd.get('all_columns_y'):
-                metric_col = df[fd.get('all_columns_y')]
-            else:
-                metric_col = df[label_col[0]]
-        point_radius_col = (
-            [None] * len(df.index)
-            if fd.get('point_radius') == 'Auto'
-            else df[fd.get('point_radius')])
-
-        # limiting geo precision as long decimal values trigger issues
-        # around json-bignumber in Mapbox
-        GEO_PRECISION = 10
-        # using geoJSON formatting
-        geo_json = {
-            'type': 'FeatureCollection',
-            'features': [
-                {
-                    'type': 'Feature',
-                    'properties': {
-                        'metric': metric,
-                        'radius': point_radius,
-                    },
-                    'geometry': {
-                        'type': 'Point',
-                        'coordinates': [
-                            round(lon, GEO_PRECISION),
-                            round(lat, GEO_PRECISION),
-                        ],
-                    },
-                }
-                for lon, lat, metric, point_radius
-                in zip(
-                    df[fd.get('all_columns_x')],
-                    df[fd.get('all_columns_y')],
-                    metric_col, point_radius_col)
-            ],
-        }
-
-        x_series, y_series = df[fd.get('all_columns_x')], df[fd.get('all_columns_y')]
-        south_west = [x_series.min(), y_series.min()]
-        north_east = [x_series.max(), y_series.max()]
-
-        return {
-            'geoJSON': geo_json,
-            'hasCustomMetric': has_custom_metric,
-            'mapboxApiKey': config.get('MAPBOX_API_KEY'),
-            'mapStyle': fd.get('mapbox_style'),
-            'aggregatorName': fd.get('pandas_aggfunc'),
-            'clusteringRadius': fd.get('clustering_radius'),
-            'pointRadiusUnit': fd.get('point_radius_unit'),
-            'globalOpacity': fd.get('global_opacity'),
-            'bounds': [south_west, north_east],
-            'renderWhileDragging': fd.get('render_while_dragging'),
-            'tooltip': fd.get('rich_tooltip'),
-            'color': fd.get('mapbox_color'),
-        }
-
-
-class DeckGLMultiLayer(BaseViz):
-
-    """Pile on multiple DeckGL layers"""
-
-    viz_type = 'deck_multi'
-    verbose_name = _('Deck.gl - Multiple Layers')
-
-    is_timeseries = False
-    credits = '<a href="https://uber.github.io/deck.gl/">deck.gl</a>'
-
-    def query_obj(self):
-        return None
-
-    def get_data(self, df):
-        fd = self.form_data
-        # Late imports to avoid circular import issues
-        from superset.models.core import Slice
-        from superset import db
-        slice_ids = fd.get('deck_slices')
-        slices = db.session.query(Slice).filter(Slice.id.in_(slice_ids)).all()
-        return {
-            'mapboxApiKey': config.get('MAPBOX_API_KEY'),
-            'slices': [slc.data for slc in slices],
-        }
-
-
-class BaseDeckGLViz(BaseViz):
-
-    """Base class for deck.gl visualizations"""
-
-    is_timeseries = False
-    credits = '<a href="https://uber.github.io/deck.gl/">deck.gl</a>'
-    spatial_control_keys = []
-
-    def get_metrics(self):
-        self.metric = self.form_data.get('size')
-        return [self.metric] if self.metric else []
-
-    def process_spatial_query_obj(self, key, group_by):
-        group_by.extend(self.get_spatial_columns(key))
-
-    def get_spatial_columns(self, key):
-        spatial = self.form_data.get(key)
-        if spatial is None:
-            raise ValueError(_('Bad spatial key'))
-
-        if spatial.get('type') == 'latlong':
-            return [spatial.get('lonCol'), spatial.get('latCol')]
-        elif spatial.get('type') == 'delimited':
-            return [spatial.get('lonlatCol')]
-        elif spatial.get('type') == 'geohash':
-            return [spatial.get('geohashCol')]
-
-    @staticmethod
-    def parse_coordinates(s):
-        if not s:
-            return None
-        try:
-            p = Point(s)
-            return (p.latitude, p.longitude)  # pylint: disable=no-member
-        except Exception:
-            raise SpatialException(
-                _('Invalid spatial point encountered: %s' % s))
-
-    @staticmethod
-    def reverse_geohash_decode(geohash_code):
-        lat, lng = geohash.decode(geohash_code)
-        return (lng, lat)
-
-    @staticmethod
-    def reverse_latlong(df, key):
-        df[key] = [
-            tuple(reversed(o))
-            for o in df[key]
-            if isinstance(o, (list, tuple))
-        ]
-
-    def process_spatial_data_obj(self, key, df):
-        spatial = self.form_data.get(key)
-        if spatial is None:
-            raise ValueError(_('Bad spatial key'))
-
-        if spatial.get('type') == 'latlong':
-            df[key] = list(zip(
-                pd.to_numeric(df[spatial.get('lonCol')], errors='coerce'),
-                pd.to_numeric(df[spatial.get('latCol')], errors='coerce'),
-            ))
-        elif spatial.get('type') == 'delimited':
-            lon_lat_col = spatial.get('lonlatCol')
-            df[key] = df[lon_lat_col].apply(self.parse_coordinates)
-            del df[lon_lat_col]
-        elif spatial.get('type') == 'geohash':
-            df[key] = df[spatial.get('geohashCol')].map(self.reverse_geohash_decode)
-            del df[spatial.get('geohashCol')]
-
-        if spatial.get('reverseCheckbox'):
-            self.reverse_latlong(df, key)
-
-        if df.get(key) is None:
-            raise NullValueException(_('Encountered invalid NULL spatial entry, \
-                                       please consider filtering those out'))
-        return df
-
-    def add_null_filters(self):
-        fd = self.form_data
-        spatial_columns = set()
-        for key in self.spatial_control_keys:
-            for column in self.get_spatial_columns(key):
-                spatial_columns.add(column)
-
-        if fd.get('adhoc_filters') is None:
-            fd['adhoc_filters'] = []
-
-        line_column = fd.get('line_column')
-        if line_column:
-            spatial_columns.add(line_column)
-
-        for column in sorted(spatial_columns):
-            filter_ = to_adhoc({
-                'col': column,
-                'op': 'IS NOT NULL',
-                'val': '',
-            })
-            fd['adhoc_filters'].append(filter_)
-
-    def query_obj(self):
-        fd = self.form_data
-
-        # add NULL filters
-        if fd.get('filter_nulls', True):
-            self.add_null_filters()
-
-        d = super().query_obj()
-        gb = []
-
-        for key in self.spatial_control_keys:
-            self.process_spatial_query_obj(key, gb)
-
-        if fd.get('dimension'):
-            gb += [fd.get('dimension')]
-
-        if fd.get('js_columns'):
-            gb += fd.get('js_columns')
-        metrics = self.get_metrics()
-        gb = list(set(gb))
-        if metrics:
-            d['groupby'] = gb
-            d['metrics'] = metrics
-            d['columns'] = []
-        else:
-            d['columns'] = gb
-        return d
-
-    def get_js_columns(self, d):
-        cols = self.form_data.get('js_columns') or []
-        return {col: d.get(col) for col in cols}
-
-    def get_data(self, df):
-        if df is None:
-            return None
-
-        # Processing spatial info
-        for key in self.spatial_control_keys:
-            df = self.process_spatial_data_obj(key, df)
-
-        features = []
-        for d in df.to_dict(orient='records'):
-            feature = self.get_properties(d)
-            extra_props = self.get_js_columns(d)
-            if extra_props:
-                feature['extraProps'] = extra_props
-            features.append(feature)
-
-        return {
-            'features': features,
-            'mapboxApiKey': config.get('MAPBOX_API_KEY'),
-            'metricLabels': self.metric_labels,
-        }
-
-    def get_properties(self, d):
-        raise NotImplementedError()
-
-
-class DeckScatterViz(BaseDeckGLViz):
-
-    """deck.gl's ScatterLayer"""
-
-    viz_type = 'deck_scatter'
-    verbose_name = _('Deck.gl - Scatter plot')
-    spatial_control_keys = ['spatial']
-    is_timeseries = True
-
-    def query_obj(self):
-        fd = self.form_data
-        self.is_timeseries = bool(
-            fd.get('time_grain_sqla') or fd.get('granularity'))
-        self.point_radius_fixed = (
-            fd.get('point_radius_fixed') or {'type': 'fix', 'value': 500})
-        return super().query_obj()
-
-    def get_metrics(self):
-        self.metric = None
-        if self.point_radius_fixed.get('type') == 'metric':
-            self.metric = self.point_radius_fixed.get('value')
-            return [self.metric]
-        return None
-
-    def get_properties(self, d):
-        return {
-            'metric': d.get(self.metric_label),
-            'radius': self.fixed_value if self.fixed_value else d.get(self.metric_label),
-            'cat_color': d.get(self.dim) if self.dim else None,
-            'position': d.get('spatial'),
-            DTTM_ALIAS: d.get(DTTM_ALIAS),
-        }
-
-    def get_data(self, df):
-        fd = self.form_data
-        self.metric_label = \
-            utils.get_metric_name(self.metric) if self.metric else None
-        self.point_radius_fixed = fd.get('point_radius_fixed')
-        self.fixed_value = None
-        self.dim = self.form_data.get('dimension')
-        if self.point_radius_fixed.get('type') != 'metric':
-            self.fixed_value = self.point_radius_fixed.get('value')
-        return super().get_data(df)
-
-
-class DeckScreengrid(BaseDeckGLViz):
-
-    """deck.gl's ScreenGridLayer"""
-
-    viz_type = 'deck_screengrid'
-    verbose_name = _('Deck.gl - Screen Grid')
-    spatial_control_keys = ['spatial']
-    is_timeseries = True
-
-    def query_obj(self):
-        fd = self.form_data
-        self.is_timeseries = fd.get('time_grain_sqla') or fd.get('granularity')
-        return super().query_obj()
-
-    def get_properties(self, d):
-        return {
-            'position': d.get('spatial'),
-            'weight': d.get(self.metric_label) or 1,
-            '__timestamp': d.get(DTTM_ALIAS) or d.get('__time'),
-        }
-
-    def get_data(self, df):
-        self.metric_label = utils.get_metric_name(self.metric)
-        return super().get_data(df)
-
-
-class DeckGrid(BaseDeckGLViz):
-
-    """deck.gl's DeckLayer"""
-
-    viz_type = 'deck_grid'
-    verbose_name = _('Deck.gl - 3D Grid')
-    spatial_control_keys = ['spatial']
-
-    def get_properties(self, d):
-        return {
-            'position': d.get('spatial'),
-            'weight': d.get(self.metric_label) or 1,
-        }
-
-    def get_data(self, df):
-        self.metric_label = utils.get_metric_name(self.metric)
-        return super().get_data(df)
+# class MapboxViz(BaseViz):
+#
+#     """Rich maps made with Mapbox"""
+#
+#     viz_type = 'mapbox'
+#     verbose_name = _('Mapbox')
+#     is_timeseries = False
+#     credits = (
+#         '<a href=https://www.mapbox.com/mapbox-gl-js/api/>Mapbox GL JS</a>')
+#
+#     def query_obj(self):
+#         d = super().query_obj()
+#         fd = self.form_data
+#         label_col = fd.get('mapbox_label')
+#
+#         if not fd.get('groupby'):
+#             if fd.get('all_columns_x') is None or fd.get('all_columns_y') is None:
+#                 raise Exception(_('[Longitude] and [Latitude] must be set'))
+#             d['columns'] = [fd.get('all_columns_x'), fd.get('all_columns_y')]
+#
+#             if label_col and len(label_col) >= 1:
+#                 if label_col[0] == 'count':
+#                     raise Exception(_(
+#                         "Must have a [Group By] column to have 'count' as the [Label]"))
+#                 d['columns'].append(label_col[0])
+#
+#             if fd.get('point_radius') != 'Auto':
+#                 d['columns'].append(fd.get('point_radius'))
+#
+#             d['columns'] = list(set(d['columns']))
+#         else:
+#             # Ensuring columns chosen are all in group by
+#             if (label_col and len(label_col) >= 1 and
+#                     label_col[0] != 'count' and
+#                     label_col[0] not in fd.get('groupby')):
+#                 raise Exception(_(
+#                     'Choice of [Label] must be present in [Group By]'))
+#
+#             if (fd.get('point_radius') != 'Auto' and
+#                     fd.get('point_radius') not in fd.get('groupby')):
+#                 raise Exception(_(
+#                     'Choice of [Point Radius] must be present in [Group By]'))
+#
+#             if (fd.get('all_columns_x') not in fd.get('groupby') or
+#                     fd.get('all_columns_y') not in fd.get('groupby')):
+#                 raise Exception(_(
+#                     '[Longitude] and [Latitude] columns must be present in [Group By]'))
+#         return d
+#
+#     def get_data(self, df):
+#         if df is None:
+#             return None
+#         fd = self.form_data
+#         label_col = fd.get('mapbox_label')
+#         has_custom_metric = label_col is not None and len(label_col) > 0
+#         metric_col = [None] * len(df.index)
+#         if has_custom_metric:
+#             if label_col[0] == fd.get('all_columns_x'):
+#                 metric_col = df[fd.get('all_columns_x')]
+#             elif label_col[0] == fd.get('all_columns_y'):
+#                 metric_col = df[fd.get('all_columns_y')]
+#             else:
+#                 metric_col = df[label_col[0]]
+#         point_radius_col = (
+#             [None] * len(df.index)
+#             if fd.get('point_radius') == 'Auto'
+#             else df[fd.get('point_radius')])
+#
+#         # limiting geo precision as long decimal values trigger issues
+#         # around json-bignumber in Mapbox
+#         GEO_PRECISION = 10
+#         # using geoJSON formatting
+#         geo_json = {
+#             'type': 'FeatureCollection',
+#             'features': [
+#                 {
+#                     'type': 'Feature',
+#                     'properties': {
+#                         'metric': metric,
+#                         'radius': point_radius,
+#                     },
+#                     'geometry': {
+#                         'type': 'Point',
+#                         'coordinates': [
+#                             round(lon, GEO_PRECISION),
+#                             round(lat, GEO_PRECISION),
+#                         ],
+#                     },
+#                 }
+#                 for lon, lat, metric, point_radius
+#                 in zip(
+#                     df[fd.get('all_columns_x')],
+#                     df[fd.get('all_columns_y')],
+#                     metric_col, point_radius_col)
+#             ],
+#         }
+#
+#         x_series, y_series = df[fd.get('all_columns_x')], df[fd.get('all_columns_y')]
+#         south_west = [x_series.min(), y_series.min()]
+#         north_east = [x_series.max(), y_series.max()]
+#
+#         return {
+#             'geoJSON': geo_json,
+#             'hasCustomMetric': has_custom_metric,
+#             'mapboxApiKey': config.get('MAPBOX_API_KEY'),
+#             'mapStyle': fd.get('mapbox_style'),
+#             'aggregatorName': fd.get('pandas_aggfunc'),
+#             'clusteringRadius': fd.get('clustering_radius'),
+#             'pointRadiusUnit': fd.get('point_radius_unit'),
+#             'globalOpacity': fd.get('global_opacity'),
+#             'bounds': [south_west, north_east],
+#             'renderWhileDragging': fd.get('render_while_dragging'),
+#             'tooltip': fd.get('rich_tooltip'),
+#             'color': fd.get('mapbox_color'),
+#         }
+#
+#
+# class DeckGLMultiLayer(BaseViz):
+#
+#     """Pile on multiple DeckGL layers"""
+#
+#     viz_type = 'deck_multi'
+#     verbose_name = _('Deck.gl - Multiple Layers')
+#
+#     is_timeseries = False
+#     credits = '<a href="https://uber.github.io/deck.gl/">deck.gl</a>'
+#
+#     def query_obj(self):
+#         return None
+#
+#     def get_data(self, df):
+#         fd = self.form_data
+#         # Late imports to avoid circular import issues
+#         from superset.models.core import Slice
+#         from superset import db
+#         slice_ids = fd.get('deck_slices')
+#         slices = db.session.query(Slice).filter(Slice.id.in_(slice_ids)).all()
+#         return {
+#             'mapboxApiKey': config.get('MAPBOX_API_KEY'),
+#             'slices': [slc.data for slc in slices],
+#         }
+#
+#
+# class BaseDeckGLViz(BaseViz):
+#
+#     """Base class for deck.gl visualizations"""
+#
+#     is_timeseries = False
+#     credits = '<a href="https://uber.github.io/deck.gl/">deck.gl</a>'
+#     spatial_control_keys = []
+#
+#     def get_metrics(self):
+#         self.metric = self.form_data.get('size')
+#         return [self.metric] if self.metric else []
+#
+#     def process_spatial_query_obj(self, key, group_by):
+#         group_by.extend(self.get_spatial_columns(key))
+#
+#     def get_spatial_columns(self, key):
+#         spatial = self.form_data.get(key)
+#         if spatial is None:
+#             raise ValueError(_('Bad spatial key'))
+#
+#         if spatial.get('type') == 'latlong':
+#             return [spatial.get('lonCol'), spatial.get('latCol')]
+#         elif spatial.get('type') == 'delimited':
+#             return [spatial.get('lonlatCol')]
+#         elif spatial.get('type') == 'geohash':
+#             return [spatial.get('geohashCol')]
+#
+#     @staticmethod
+#     def parse_coordinates(s):
+#         if not s:
+#             return None
+#         try:
+#             p = Point(s)
+#             return (p.latitude, p.longitude)  # pylint: disable=no-member
+#         except Exception:
+#             raise SpatialException(
+#                 _('Invalid spatial point encountered: %s' % s))
+#
+#     @staticmethod
+#     def reverse_geohash_decode(geohash_code):
+#         lat, lng = geohash.decode(geohash_code)
+#         return (lng, lat)
+#
+#     @staticmethod
+#     def reverse_latlong(df, key):
+#         df[key] = [
+#             tuple(reversed(o))
+#             for o in df[key]
+#             if isinstance(o, (list, tuple))
+#         ]
+#
+#     def process_spatial_data_obj(self, key, df):
+#         spatial = self.form_data.get(key)
+#         if spatial is None:
+#             raise ValueError(_('Bad spatial key'))
+#
+#         if spatial.get('type') == 'latlong':
+#             df[key] = list(zip(
+#                 pd.to_numeric(df[spatial.get('lonCol')], errors='coerce'),
+#                 pd.to_numeric(df[spatial.get('latCol')], errors='coerce'),
+#             ))
+#         elif spatial.get('type') == 'delimited':
+#             lon_lat_col = spatial.get('lonlatCol')
+#             df[key] = df[lon_lat_col].apply(self.parse_coordinates)
+#             del df[lon_lat_col]
+#         elif spatial.get('type') == 'geohash':
+#             df[key] = df[spatial.get('geohashCol')].map(self.reverse_geohash_decode)
+#             del df[spatial.get('geohashCol')]
+#
+#         if spatial.get('reverseCheckbox'):
+#             self.reverse_latlong(df, key)
+#
+#         if df.get(key) is None:
+#             raise NullValueException(_('Encountered invalid NULL spatial entry, \
+#                                        please consider filtering those out'))
+#         return df
+#
+#     def add_null_filters(self):
+#         fd = self.form_data
+#         spatial_columns = set()
+#         for key in self.spatial_control_keys:
+#             for column in self.get_spatial_columns(key):
+#                 spatial_columns.add(column)
+#
+#         if fd.get('adhoc_filters') is None:
+#             fd['adhoc_filters'] = []
+#
+#         line_column = fd.get('line_column')
+#         if line_column:
+#             spatial_columns.add(line_column)
+#
+#         for column in sorted(spatial_columns):
+#             filter_ = to_adhoc({
+#                 'col': column,
+#                 'op': 'IS NOT NULL',
+#                 'val': '',
+#             })
+#             fd['adhoc_filters'].append(filter_)
+#
+#     def query_obj(self):
+#         fd = self.form_data
+#
+#         # add NULL filters
+#         if fd.get('filter_nulls', True):
+#             self.add_null_filters()
+#
+#         d = super().query_obj()
+#         gb = []
+#
+#         for key in self.spatial_control_keys:
+#             self.process_spatial_query_obj(key, gb)
+#
+#         if fd.get('dimension'):
+#             gb += [fd.get('dimension')]
+#
+#         if fd.get('js_columns'):
+#             gb += fd.get('js_columns')
+#         metrics = self.get_metrics()
+#         gb = list(set(gb))
+#         if metrics:
+#             d['groupby'] = gb
+#             d['metrics'] = metrics
+#             d['columns'] = []
+#         else:
+#             d['columns'] = gb
+#         return d
+#
+#     def get_js_columns(self, d):
+#         cols = self.form_data.get('js_columns') or []
+#         return {col: d.get(col) for col in cols}
+#
+#     def get_data(self, df):
+#         if df is None:
+#             return None
+#
+#         # Processing spatial info
+#         for key in self.spatial_control_keys:
+#             df = self.process_spatial_data_obj(key, df)
+#
+#         features = []
+#         for d in df.to_dict(orient='records'):
+#             feature = self.get_properties(d)
+#             extra_props = self.get_js_columns(d)
+#             if extra_props:
+#                 feature['extraProps'] = extra_props
+#             features.append(feature)
+#
+#         return {
+#             'features': features,
+#             'mapboxApiKey': config.get('MAPBOX_API_KEY'),
+#             'metricLabels': self.metric_labels,
+#         }
+#
+#     def get_properties(self, d):
+#         raise NotImplementedError()
+#
+#
+# class DeckScatterViz(BaseDeckGLViz):
+#
+#     """deck.gl's ScatterLayer"""
+#
+#     viz_type = 'deck_scatter'
+#     verbose_name = _('Deck.gl - Scatter plot')
+#     spatial_control_keys = ['spatial']
+#     is_timeseries = True
+#
+#     def query_obj(self):
+#         fd = self.form_data
+#         self.is_timeseries = bool(
+#             fd.get('time_grain_sqla') or fd.get('granularity'))
+#         self.point_radius_fixed = (
+#             fd.get('point_radius_fixed') or {'type': 'fix', 'value': 500})
+#         return super().query_obj()
+#
+#     def get_metrics(self):
+#         self.metric = None
+#         if self.point_radius_fixed.get('type') == 'metric':
+#             self.metric = self.point_radius_fixed.get('value')
+#             return [self.metric]
+#         return None
+#
+#     def get_properties(self, d):
+#         return {
+#             'metric': d.get(self.metric_label),
+#             'radius': self.fixed_value if self.fixed_value else d.get(self.metric_label),
+#             'cat_color': d.get(self.dim) if self.dim else None,
+#             'position': d.get('spatial'),
+#             DTTM_ALIAS: d.get(DTTM_ALIAS),
+#         }
+#
+#     def get_data(self, df):
+#         fd = self.form_data
+#         self.metric_label = \
+#             utils.get_metric_name(self.metric) if self.metric else None
+#         self.point_radius_fixed = fd.get('point_radius_fixed')
+#         self.fixed_value = None
+#         self.dim = self.form_data.get('dimension')
+#         if self.point_radius_fixed.get('type') != 'metric':
+#             self.fixed_value = self.point_radius_fixed.get('value')
+#         return super().get_data(df)
+#
+#
+# class DeckScreengrid(BaseDeckGLViz):
+#
+#     """deck.gl's ScreenGridLayer"""
+#
+#     viz_type = 'deck_screengrid'
+#     verbose_name = _('Deck.gl - Screen Grid')
+#     spatial_control_keys = ['spatial']
+#     is_timeseries = True
+#
+#     def query_obj(self):
+#         fd = self.form_data
+#         self.is_timeseries = fd.get('time_grain_sqla') or fd.get('granularity')
+#         return super().query_obj()
+#
+#     def get_properties(self, d):
+#         return {
+#             'position': d.get('spatial'),
+#             'weight': d.get(self.metric_label) or 1,
+#             '__timestamp': d.get(DTTM_ALIAS) or d.get('__time'),
+#         }
+#
+#     def get_data(self, df):
+#         self.metric_label = utils.get_metric_name(self.metric)
+#         return super().get_data(df)
+#
+#
+# class DeckGrid(BaseDeckGLViz):
+#
+#     """deck.gl's DeckLayer"""
+#
+#     viz_type = 'deck_grid'
+#     verbose_name = _('Deck.gl - 3D Grid')
+#     spatial_control_keys = ['spatial']
+#
+#     def get_properties(self, d):
+#         return {
+#             'position': d.get('spatial'),
+#             'weight': d.get(self.metric_label) or 1,
+#         }
+#
+#     def get_data(self, df):
+#         self.metric_label = utils.get_metric_name(self.metric)
+#         return super().get_data(df)
 
 
 def geohash_to_json(geohash_code):
