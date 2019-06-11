@@ -31,7 +31,6 @@ import DashboardComponent from '../../../../src/dashboard/containers/DashboardCo
 import DashboardHeader from '../../../../src/dashboard/containers/DashboardHeader';
 import DashboardGrid from '../../../../src/dashboard/containers/DashboardGrid';
 import * as dashboardStateActions from '../../../../src/dashboard/actions/dashboardState';
-import { BUILDER_PANE_TYPE } from '../../../../src/dashboard/util/constants';
 
 import WithDragDropContext from '../helpers/WithDragDropContext';
 import {
@@ -62,10 +61,7 @@ describe('DashboardBuilder', () => {
     dashboardLayout,
     deleteTopLevelTabs() {},
     editMode: false,
-    showBuilderPane() {},
-    builderPaneType: BUILDER_PANE_TYPE.NONE,
-    setColorSchemeAndUnsavedChanges() {},
-    colorScheme: undefined,
+    showBuilderPane: false,
     handleComponentDrop() {},
     toggleBuilderPane() {},
   };
@@ -147,27 +143,11 @@ describe('DashboardBuilder', () => {
     expect(parentSize.find(DashboardGrid)).toHaveLength(expectedCount);
   });
 
-  it('should render a BuilderComponentPane if editMode=true and user selects "Insert Components" pane', () => {
+  it('should render a BuilderComponentPane if editMode=showBuilderPane=true', () => {
     const wrapper = setup();
     expect(wrapper.find(BuilderComponentPane)).toHaveLength(0);
 
-    wrapper.setProps({
-      ...props,
-      editMode: true,
-      builderPaneType: BUILDER_PANE_TYPE.ADD_COMPONENTS,
-    });
-    expect(wrapper.find(BuilderComponentPane)).toHaveLength(1);
-  });
-
-  it('should render a BuilderComponentPane if editMode=true and user selects "Colors" pane', () => {
-    const wrapper = setup();
-    expect(wrapper.find(BuilderComponentPane)).toHaveLength(0);
-
-    wrapper.setProps({
-      ...props,
-      editMode: true,
-      builderPaneType: BUILDER_PANE_TYPE.COLORS,
-    });
+    wrapper.setProps({ ...props, editMode: true, showBuilderPane: true });
     expect(wrapper.find(BuilderComponentPane)).toHaveLength(1);
   });
 

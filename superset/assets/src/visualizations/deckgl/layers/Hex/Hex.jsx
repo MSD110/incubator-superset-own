@@ -17,49 +17,37 @@
  * under the License.
  */
 import { HexagonLayer } from 'deck.gl';
-import React from 'react';
-import { t } from '@superset-ui/translation';
 
 import { commonLayerProps, getAggFunc  } from '../common';
 import sandboxedEval from '../../../../modules/sandbox';
 import { createDeckGLComponent } from '../../factory';
-import TooltipRow from '../../TooltipRow';
-
-function setTooltipContent(o) {
-  return (
-    <div className="deckgl-tooltip">
-      <TooltipRow label={`${t('Centroid (Longitude and Latitude)')}: `} value={`(${o.object.centroid[0]}, ${o.object.centroid[1]})`} />
-      <TooltipRow label={`${t('Height')}: `} value={`${o.object.elevationValue}`} />
-    </div>
-  );
-}
 
 export function getLayer(formData, payload, onAddFilter, setTooltip) {
   const fd = formData;
-  const c = fd.color_picker;
+  const c = fd.colorPicker;
   let data = payload.data.features.map(d => ({
     ...d,
     color: [c.r, c.g, c.b, 255 * c.a],
   }));
 
-  if (fd.js_data_mutator) {
+  if (fd.jsDataMutator) {
     // Applying user defined data mutator if defined
-    const jsFnMutator = sandboxedEval(fd.js_data_mutator);
+    const jsFnMutator = sandboxedEval(fd.jsDataMutator);
     data = jsFnMutator(data);
   }
-  const aggFunc = getAggFunc(fd.js_agg_function, p => p.weight);
+  const aggFunc = getAggFunc(fd.jsAggFunction, p => p.weight);
   return new HexagonLayer({
-    id: `hex-layer-${fd.slice_id}`,
+    id: `hex-layer-${fd.sliceId}`,
     data,
     pickable: true,
-    radius: fd.grid_size,
+    radius: fd.gridSize,
     minColor: [0, 0, 0, 0],
     extruded: fd.extruded,
     maxColor: [c.r, c.g, c.b, 255 * c.a],
     outline: false,
     getElevationValue: aggFunc,
     getColorValue: aggFunc,
-    ...commonLayerProps(fd, setTooltip, setTooltipContent),
+    ...commonLayerProps(fd, setTooltip),
   });
 }
 

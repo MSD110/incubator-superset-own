@@ -79,15 +79,13 @@ export default class TemplateParamsEditor extends React.Component {
   renderDoc() {
     return (
       <p>
-        {t('Assign a set of parameters as')}
-        <code>JSON</code>
-        {t('below (example:')}
-        <code>{'{"my_table": "foo"}'}</code>
-        {t('), and they become available in your SQL (example:')}
-        <code>SELECT * FROM {'{{ my_table }}'} </code>
-        {t(') by using')}&nbsp;
+        Assign a set of parameters as <code>JSON</code> below
+        (example: <code>{'{"my_table": "foo"}'}</code>),
+        and they become available
+        in your SQL (example: <code>SELECT * FROM {'{{ my_table }}'} </code>)
+        by using&nbsp;
         <a
-          href="https://superset.apache.org/sqllab.html#templating-with-jinja"
+          href="http://superset.apache.org/sqllab.html#templating-with-jinja"
           target="_blank"
           rel="noopener noreferrer"
         >

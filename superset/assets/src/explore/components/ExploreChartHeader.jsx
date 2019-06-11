@@ -50,8 +50,8 @@ const propTypes = {
 };
 
 class ExploreChartHeader extends React.PureComponent {
-  postChartFormData() {
-    this.props.actions.postChartFormData(this.props.form_data, true,
+  runQuery() {
+    this.props.actions.runQuery(this.props.form_data, true,
       this.props.timeout, this.props.chart.id);
   }
 
@@ -94,7 +94,7 @@ class ExploreChartHeader extends React.PureComponent {
       chartUpdateStartTime,
       latestQueryFormData,
       queryResponse } = this.props.chart;
-      const chartFinished = ['failed', 'rendered', 'success'].includes(this.props.chart.chartStatus);
+    const chartSucceeded = ['success', 'rendered'].indexOf(this.props.chart.chartStatus) > 0;
     return (
       <div
         id="slice-header"
@@ -135,14 +135,14 @@ class ExploreChartHeader extends React.PureComponent {
           />
         }
         <div className="pull-right">
-          {chartFinished && queryResponse &&
+          {chartSucceeded && queryResponse &&
             <RowCountLabel
               rowcount={queryResponse.rowcount}
               limit={formData.row_limit}
             />}
-          {chartFinished && queryResponse && queryResponse.is_cached &&
+          {chartSucceeded && queryResponse && queryResponse.is_cached &&
             <CachedLabel
-              onClick={this.postChartFormData.bind(this)}
+              onClick={this.runQuery.bind(this)}
               cachedTimestamp={queryResponse.cached_dttm}
             />}
           <Timer

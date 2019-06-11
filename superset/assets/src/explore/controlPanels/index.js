@@ -22,7 +22,6 @@
  */
 import { isFeatureEnabled, FeatureFlag } from 'src/featureFlags';
 import * as sections from './sections';
-import extraOverrides from './extraOverrides';
 
 import Area from './Area';
 import Bar from './Bar';
@@ -40,6 +39,7 @@ import DistBar from './DistBar';
 import DualLine from './DualLine';
 import EventFlow from './EventFlow';
 import FilterBox from './FilterBox';
+import Funnel from './Funnel';
 import Heatmap from './Heatmap';
 import Histogram from './Histogram';
 import Horizon from './Horizon';
@@ -58,6 +58,7 @@ import Sankey from './Sankey';
 import Sunburst from './Sunburst';
 import Separator from './Separator';
 import Table from './Table';
+import TableDrillDown from './TableDrillDown';
 import TimePivot from './TimePivot';
 import TimeTable from './TimeTable';
 import Treemap from './Treemap';
@@ -73,7 +74,7 @@ import DeckPolygon from './DeckPolygon';
 import DeckScatter from './DeckScatter';
 import DeckScreengrid from './DeckScreengrid';
 
-export const controlPanelConfigs = extraOverrides({
+export const controlPanelConfigs = {
   area: Area,
   bar: Bar,
   big_number: BigNumber,
@@ -90,6 +91,7 @@ export const controlPanelConfigs = extraOverrides({
   dual_line: DualLine,
   event_flow: EventFlow,
   filter_box: FilterBox,
+  funnel: Funnel,
   heatmap: Heatmap,
   histogram: Histogram,
   horizon: Horizon,
@@ -108,6 +110,7 @@ export const controlPanelConfigs = extraOverrides({
   separator: Separator,
   sunburst: Sunburst,
   table: Table,
+  table_drill_down: TableDrillDown,
   time_pivot: TimePivot,
   time_table: TimeTable,
   treemap: Treemap,
@@ -122,32 +125,32 @@ export const controlPanelConfigs = extraOverrides({
   deck_polygon: DeckPolygon,
   deck_scatter: DeckScatter,
   deck_screengrid: DeckScreengrid,
-});
+
+};
 
 export default controlPanelConfigs;
 
 export function sectionsToRender(vizType, datasourceType) {
-  const { sectionOverrides = {}, controlPanelSections = [] } = controlPanelConfigs[vizType] || {};
+  const config = controlPanelConfigs[vizType];
 
   const sectionsCopy = { ...sections };
-
-  Object.entries(sectionOverrides).forEach(([section, overrides]) => {
-    if (typeof overrides === 'object' && overrides.constructor === Object) {
-      sectionsCopy[section] = {
-        ...sectionsCopy[section],
-        ...overrides,
-      };
-    } else {
-      sectionsCopy[section] = overrides;
-    }
-  });
-
-  const { datasourceAndVizType, sqlaTimeSeries, druidTimeSeries, filters } = sectionsCopy;
+  if (config.sectionOverrides) {
+    Object.entries(config.sectionOverrides).forEach(([section, overrides]) => {
+      if (typeof overrides === 'object' && overrides.constructor === Object) {
+        sectionsCopy[section] = {
+          ...sectionsCopy[section],
+          ...overrides,
+        };
+      } else {
+        sectionsCopy[section] = overrides;
+      }
+    });
+  }
 
   return [].concat(
-    datasourceAndVizType,
-    datasourceType === 'table' ? sqlaTimeSeries : druidTimeSeries,
-    isFeatureEnabled(FeatureFlag.SCOPED_FILTER) ? filters : undefined,
-    controlPanelSections,
+    sectionsCopy.datasourceAndVizType,
+    datasourceType === 'table' ? sectionsCopy.sqlaTimeSeries : sectionsCopy.druidTimeSeries,
+    isFeatureEnabled(FeatureFlag.SCOPED_FILTER) ? sectionsCopy.filters : undefined,
+    config.controlPanelSections,
   ).filter(section => section);
 }

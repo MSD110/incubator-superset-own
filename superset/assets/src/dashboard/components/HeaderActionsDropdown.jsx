@@ -37,13 +37,9 @@ const propTypes = {
   dashboardTitle: PropTypes.string.isRequired,
   hasUnsavedChanges: PropTypes.bool.isRequired,
   css: PropTypes.string.isRequired,
-  colorNamespace: PropTypes.string,
-  colorScheme: PropTypes.string,
   onChange: PropTypes.func.isRequired,
   updateCss: PropTypes.func.isRequired,
   forceRefreshAllCharts: PropTypes.func.isRequired,
-  refreshFrequency: PropTypes.number.isRequired,
-  setRefreshFrequency: PropTypes.func.isRequired,
   startPeriodicRender: PropTypes.func.isRequired,
   editMode: PropTypes.bool.isRequired,
   userCanEdit: PropTypes.bool.isRequired,
@@ -55,10 +51,7 @@ const propTypes = {
   onSave: PropTypes.func.isRequired,
 };
 
-const defaultProps = {
-  colorNamespace: undefined,
-  colorScheme: undefined,
-};
+const defaultProps = {};
 
 class HeaderActionsDropdown extends React.PureComponent {
   static discardChanges() {
@@ -73,7 +66,6 @@ class HeaderActionsDropdown extends React.PureComponent {
     };
 
     this.changeCss = this.changeCss.bind(this);
-    this.changeRefreshInterval = this.changeRefreshInterval.bind(this);
   }
 
   componentWillMount() {
@@ -103,21 +95,14 @@ class HeaderActionsDropdown extends React.PureComponent {
     this.props.updateCss(css);
   }
 
-  changeRefreshInterval(refreshInterval) {
-    this.props.setRefreshFrequency(refreshInterval);
-    this.props.startPeriodicRender(refreshInterval * 1000);
-  }
-
   render() {
     const {
       dashboardTitle,
       dashboardId,
+      startPeriodicRender,
       forceRefreshAllCharts,
-      refreshFrequency,
       editMode,
       css,
-      colorNamespace,
-      colorScheme,
       hasUnsavedChanges,
       layout,
       filters,
@@ -150,10 +135,7 @@ class HeaderActionsDropdown extends React.PureComponent {
             layout={layout}
             filters={filters}
             expandedSlices={expandedSlices}
-            refreshFrequency={refreshFrequency}
             css={css}
-            colorNamespace={colorNamespace}
-            colorScheme={colorScheme}
             onSave={onSave}
             isMenuItem
             triggerNode={<span>{t('Save as')}</span>}
@@ -177,13 +159,12 @@ class HeaderActionsDropdown extends React.PureComponent {
         <MenuItem onClick={forceRefreshAllCharts} disabled={isLoading}>
           {t('Force refresh dashboard')}
         </MenuItem>
-        {editMode && (
-          <RefreshIntervalModal
-            refreshFrequency={refreshFrequency}
-            onChange={this.changeRefreshInterval}
-            triggerNode={<span>{t('Set auto-refresh interval')}</span>}
-          />
-        )}
+        <RefreshIntervalModal
+          onChange={refreshInterval =>
+            startPeriodicRender(refreshInterval * 1000)
+          }
+          triggerNode={<span>{t('Set auto-refresh interval')}</span>}
+        />
         {editMode && (
           <MenuItem target="_blank" href={`/dashboard/edit/${dashboardId}`}>
             {t('Edit dashboard metadata')}
@@ -191,11 +172,7 @@ class HeaderActionsDropdown extends React.PureComponent {
         )}
 
         <URLShortLinkModal
-          url={getDashboardUrl(
-            window.location.pathname,
-            this.props.filters,
-            window.location.hash,
-          )}
+          url={getDashboardUrl(window.location.pathname, this.props.filters)}
           emailSubject={emailSubject}
           emailContent={emailBody}
           addDangerToast={this.props.addDangerToast}

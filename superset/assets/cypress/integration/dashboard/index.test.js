@@ -22,7 +22,6 @@ import DashboardFavStarTest from './fav_star';
 import DashboardFilterTest from './filter';
 import DashboardLoadTest from './load';
 import DashboardSaveTest from './save';
-import DashboardTabsTest from './tabs';
 
 describe('Dashboard', () => {
   DashboardControlsTest();
@@ -31,5 +30,4 @@ describe('Dashboard', () => {
   DashboardFilterTest();
   DashboardLoadTest();
   DashboardSaveTest();
-  DashboardTabsTest();
 });

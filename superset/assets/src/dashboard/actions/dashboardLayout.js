@@ -17,9 +17,8 @@
  * under the License.
  */
 import { ActionCreators as UndoActionCreators } from 'redux-undo';
-import { t } from '@superset-ui/translation';
 
-import { addWarningToast } from '../../messageToasts/actions';
+import { addInfoToast } from '../../messageToasts/actions';
 import { setUnsavedChanges } from './dashboardState';
 import { TABS_TYPE, ROW_TYPE } from '../util/componentTypes';
 import {
@@ -154,10 +153,8 @@ export function handleComponentDrop(dropResult) {
 
     if (overflowsParent) {
       return dispatch(
-        addWarningToast(
-          t(
-            `There is not enough space for this component. Try decreasing its width, or increasing the destination width.`,
-          ),
+        addInfoToast(
+          `There is not enough space for this component. Try decreasing its width, or increasing the destination width.`,
         ),
       );
     }
@@ -165,29 +162,11 @@ export function handleComponentDrop(dropResult) {
     const { source, destination } = dropResult;
     const droppedOnRoot = destination && destination.id === DASHBOARD_ROOT_ID;
     const isNewComponent = source.id === NEW_COMPONENTS_SOURCE_ID;
-    const dashboardRoot = getState().dashboardLayout.present[DASHBOARD_ROOT_ID];
-    const rootChildId =
-      dashboardRoot && dashboardRoot.children ? dashboardRoot.children[0] : '';
 
     if (droppedOnRoot) {
       dispatch(createTopLevelTabs(dropResult));
     } else if (destination && isNewComponent) {
       dispatch(createComponent(dropResult));
-    } else if (
-      // Add additional allow-to-drop logic for tag/tags source.
-      // We only allow
-      // - top-level tab => top-level tab: rearrange top-level tab order
-      // - nested tab => top-level tab: allow row tab become top-level tab
-      // Dashboard does not allow top-level tab become nested tab, to avoid
-      // nested tab inside nested tab.
-      source.type === TABS_TYPE &&
-      destination.type === TABS_TYPE &&
-      source.id === rootChildId &&
-      destination.id !== rootChildId
-    ) {
-      return dispatch(
-        addWarningToast(t(`Can not move top level tab into nested tabs`)),
-      );
     } else if (
       destination &&
       source &&
@@ -197,8 +176,6 @@ export function handleComponentDrop(dropResult) {
       dispatch(moveComponent(dropResult));
     }
 
-    // call getState() again down here in case redux state is stale after
-    // previous dispatch(es)
     const { dashboardLayout: undoableLayout } = getState();
 
     // if we moved a child from a Tab or Row parent and it was the only child, delete the parent.
@@ -232,8 +209,7 @@ export function undoLayoutAction() {
 
     if (
       dashboardLayout.past.length === 0 &&
-      !dashboardState.maxUndoHistoryExceeded &&
-      !dashboardState.updatedColorScheme
+      !dashboardState.maxUndoHistoryExceeded
     ) {
       dispatch(setUnsavedChanges(false));
     }
@@ -243,6 +219,3 @@ export function undoLayoutAction() {
 export const redoLayoutAction = setUnsavedChangesAfterAction(
   UndoActionCreators.redo,
 );
-
-// Update component parents list ----------------------------------------------
-export const UPDATE_COMPONENTS_PARENTS_LIST = 'UPDATE_COMPONENTS_PARENTS_LIST';

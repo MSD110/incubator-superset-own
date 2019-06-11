@@ -20,7 +20,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { Sparkline, LineSeries, PointSeries, HorizontalReferenceLine, VerticalReferenceLine, WithTooltip } from '@data-ui/sparkline';
 import { formatNumber } from '@superset-ui/number-format';
-import { getTextDimension } from '@superset-ui/dimension';
+import { getTextDimension } from '../../modules/visUtils';
 
 const propTypes = {
   className: PropTypes.string,

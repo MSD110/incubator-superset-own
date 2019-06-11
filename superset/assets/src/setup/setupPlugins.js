@@ -16,8 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import MainPreset from '../visualizations/presets/MainPreset';
+import LegacyChartPreset from '../visualizations/presets/LegacyChartPreset';
 
 export default function setupPlugins() {
-  new MainPreset().register();
+  new LegacyChartPreset().register();
 }

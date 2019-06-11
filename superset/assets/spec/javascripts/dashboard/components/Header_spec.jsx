@@ -24,7 +24,6 @@ import FaveStar from '../../../../src/components/FaveStar';
 import HeaderActionsDropdown from '../../../../src/dashboard/components/HeaderActionsDropdown';
 import Button from '../../../../src/components/Button';
 import UndoRedoKeylisteners from '../../../../src/dashboard/components/UndoRedoKeylisteners';
-import { BUILDER_PANE_TYPE } from '../../../../src/dashboard/util/constants';
 
 describe('Header', () => {
   const props = {
@@ -47,8 +46,7 @@ describe('Header', () => {
     updateDashboardTitle: () => {},
     editMode: false,
     setEditMode: () => {},
-    showBuilderPane: () => {},
-    builderPaneType: BUILDER_PANE_TYPE.NONE,
+    showBuilderPane: false,
     toggleBuilderPane: () => {},
     updateCss: () => {},
     hasUnsavedChanges: false,
@@ -152,9 +150,9 @@ describe('Header', () => {
       expect(wrapper.find(HeaderActionsDropdown)).toHaveLength(1);
     });
 
-    it('should render five Buttons', () => {
+    it('should render four Buttons', () => {
       const wrapper = setup(overrideProps);
-      expect(wrapper.find(Button)).toHaveLength(5);
+      expect(wrapper.find(Button)).toHaveLength(4);
     });
 
     it('should set up undo/redo', () => {

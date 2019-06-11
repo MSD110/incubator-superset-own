@@ -31,9 +31,7 @@ import os
 import signal
 import smtplib
 import sys
-from time import struct_time
-from typing import List, Optional, Tuple
-from urllib.parse import unquote_plus
+from typing import Optional
 import uuid
 import zlib
 
@@ -41,8 +39,7 @@ import bleach
 import celery
 from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta
-from flask import flash, Flask, g, Markup, render_template
-from flask_appbuilder.security.sqla.models import User
+from flask import flash, g, Markup, render_template
 from flask_babel import gettext as __
 from flask_babel import lazy_gettext as _
 from flask_caching import Cache
@@ -54,7 +51,6 @@ from pydruid.utils.having import Having
 import sqlalchemy as sa
 from sqlalchemy import event, exc, select, Text
 from sqlalchemy.dialects.mysql import MEDIUMTEXT
-from sqlalchemy.sql.type_api import Variant
 from sqlalchemy.types import TEXT, TypeDecorator
 
 from superset.exceptions import SupersetException, SupersetTimeoutException
@@ -142,21 +138,11 @@ def memoized(func=None, watch=None):
         return wrapper
 
 
-def parse_js_uri_path_item(item: Optional[str], unquote: bool = True,
-                           eval_undefined: bool = False) -> Optional[str]:
-    """Parse a uri path item made with js.
-
-    :param item: a uri path component
-    :param unquote: Perform unquoting of string using urllib.parse.unquote_plus()
-    :param eval_undefined: When set to True and item is either 'null'  or 'undefined',
-    assume item is undefined and return None.
-    :return: Either None, the original item or unquoted item
-    """
-    item = None if eval_undefined and item in ('null', 'undefined') else item
-    return unquote_plus(item) if unquote and item else item
+def js_string_to_python(item):
+    return None if item in ('null', 'undefined') else item
 
 
-def string_to_num(s: str):
+def string_to_num(s):
     """Converts a string to an int/float
 
     Returns ``None`` if it can't be converted
@@ -196,7 +182,7 @@ class DimSelector(Having):
         }
 
 
-def list_minus(l: List, minus: List) -> List:
+def list_minus(l, minus):
     """Returns l without what is in minus
 
     >>> list_minus([1, 2, 3], [2])
@@ -244,7 +230,7 @@ def parse_human_datetime(s):
     return dttm
 
 
-def dttm_from_timtuple(d: struct_time) -> datetime:
+def dttm_from_timtuple(d):
     return datetime(
         d.tm_year, d.tm_mon, d.tm_mday, d.tm_hour, d.tm_min, d.tm_sec)
 
@@ -298,7 +284,7 @@ class DashboardEncoder(json.JSONEncoder):
             return json.JSONEncoder.default(self, o)
 
 
-def parse_human_timedelta(s: str):
+def parse_human_timedelta(s):
     """
     Returns ``datetime.datetime`` from natural language time deltas
 
@@ -342,8 +328,6 @@ def datetime_f(dttm):
 
 
 def base_json_conv(obj):
-    if isinstance(obj, memoryview):
-        obj = obj.tobytes()
     if isinstance(obj, numpy.int64):
         return int(obj)
     elif isinstance(obj, numpy.bool_):
@@ -358,12 +342,12 @@ def base_json_conv(obj):
         return str(obj)
     elif isinstance(obj, bytes):
         try:
-            return obj.decode('utf-8')
+            return '{}'.format(obj)
         except Exception:
             return '[bytes]'
 
 
-def json_iso_dttm_ser(obj, pessimistic: Optional[bool] = False):
+def json_iso_dttm_ser(obj, pessimistic=False):
     """
     json serializer that deals with dates
 
@@ -434,7 +418,7 @@ def error_msg_from_exception(e):
     return msg or '{}'.format(e)
 
 
-def markdown(s: str, markup_wrap: Optional[bool] = False) -> str:
+def markdown(s, markup_wrap=False):
     safe_markdown_tags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'b', 'i',
                           'strong', 'em', 'tt', 'p', 'br', 'span',
                           'div', 'blockquote', 'code', 'hr', 'ul', 'ol',
@@ -452,7 +436,7 @@ def markdown(s: str, markup_wrap: Optional[bool] = False) -> str:
     return s
 
 
-def readfile(file_path: str) -> Optional[str]:
+def readfile(file_path):
     with open(file_path) as f:
         content = f.read()
     return content
@@ -691,18 +675,17 @@ def send_MIME_email(e_from, e_to, mime_msg, config, dryrun=False):
         logging.info(mime_msg.as_string())
 
 
-def get_email_address_list(address_string: str) -> List[str]:
-    address_string_list: List[str] = []
+def get_email_address_list(address_string):
     if isinstance(address_string, str):
         if ',' in address_string:
-            address_string_list = address_string.split(',')
+            address_string = address_string.split(',')
         elif '\n' in address_string:
-            address_string_list = address_string.split('\n')
+            address_string = address_string.split('\n')
         elif ';' in address_string:
-            address_string_list = address_string.split(';')
+            address_string = address_string.split(';')
         else:
-            address_string_list = [address_string]
-    return [x.strip() for x in address_string_list if x.strip()]
+            address_string = [address_string]
+    return [x.strip() for x in address_string if x.strip()]
 
 
 def choicify(values):
@@ -710,12 +693,10 @@ def choicify(values):
     return [(v, v) for v in values]
 
 
-def setup_cache(app: Flask, cache_config) -> Optional[Cache]:
+def setup_cache(app, cache_config):
     """Setup the flask-cache on a flask app"""
     if cache_config and cache_config.get('CACHE_TYPE') != 'null':
         return Cache(app, config=cache_config)
-
-    return None
 
 
 def zlib_compress(data):
@@ -783,7 +764,7 @@ def to_adhoc(filt, expressionType='SIMPLE', clause='where'):
     return result
 
 
-def merge_extra_filters(form_data: dict):
+def merge_extra_filters(form_data):
     # extra_filters are temporary/contextual filters (using the legacy constructs)
     # that are external to the slice definition. We use those for dynamic
     # interactive filters like the ones emitted by the "Filter Box" visualization.
@@ -854,7 +835,7 @@ def merge_extra_filters(form_data: dict):
         del form_data['extra_filters']
 
 
-def merge_request_params(form_data: dict, params: dict):
+def merge_request_params(form_data, params):
     url_params = {}
     for key, value in params.items():
         if key in ('form_data', 'r'):
@@ -863,15 +844,18 @@ def merge_request_params(form_data: dict, params: dict):
     form_data['url_params'] = url_params
 
 
-def user_label(user: User) -> Optional[str]:
+def get_update_perms_flag():
+    val = os.environ.get('SUPERSET_UPDATE_PERMS')
+    return val.lower() not in ('0', 'false', 'no') if val else True
+
+
+def user_label(user):
     """Given a user ORM FAB object, returns a label"""
     if user:
         if user.first_name and user.last_name:
             return user.first_name + ' ' + user.last_name
         else:
             return user.username
-
-    return None
 
 
 def get_or_create_main_db():
@@ -901,7 +885,7 @@ def get_main_database(session):
     )
 
 
-def is_adhoc_metric(metric) -> bool:
+def is_adhoc_metric(metric):
     return (
         isinstance(metric, dict) and
         (
@@ -927,7 +911,7 @@ def get_metric_names(metrics):
     return [get_metric_name(metric) for metric in metrics]
 
 
-def ensure_path_exists(path: str):
+def ensure_path_exists(path):
     try:
         os.makedirs(path)
     except OSError as exc:
@@ -939,7 +923,7 @@ def get_since_until(time_range: Optional[str] = None,
                     since: Optional[str] = None,
                     until: Optional[str] = None,
                     time_shift: Optional[str] = None,
-                    relative_end: Optional[str] = None) -> Tuple[datetime, datetime]:
+                    relative_end: Optional[str] = None) -> (datetime, datetime):
     """Return `since` and `until` date time tuple from string representations of
     time_range, since, until and time_shift.
 
@@ -967,11 +951,11 @@ def get_since_until(time_range: Optional[str] = None,
     separator = ' : '
     relative_end = parse_human_datetime(relative_end if relative_end else 'today')
     common_time_frames = {
-        'Last day': (relative_end - relativedelta(days=1), relative_end),  # noqa: T400
-        'Last week': (relative_end - relativedelta(weeks=1), relative_end),  # noqa: T400
-        'Last month': (relative_end - relativedelta(months=1), relative_end),  # noqa: E501, T400
-        'Last quarter': (relative_end - relativedelta(months=3), relative_end),  # noqa: E501, T400
-        'Last year': (relative_end - relativedelta(years=1), relative_end),  # noqa: T400
+        'Last day': (relative_end - relativedelta(days=1), relative_end),
+        'Last week': (relative_end - relativedelta(weeks=1), relative_end),
+        'Last month': (relative_end - relativedelta(months=1), relative_end),
+        'Last quarter': (relative_end - relativedelta(months=3), relative_end),
+        'Last year': (relative_end - relativedelta(years=1), relative_end),
     }
 
     if time_range:
@@ -988,11 +972,11 @@ def get_since_until(time_range: Optional[str] = None,
         else:
             rel, num, grain = time_range.split()
             if rel == 'Last':
-                since = relative_end - relativedelta(**{grain: int(num)})  # noqa: T400
+                since = relative_end - relativedelta(**{grain: int(num)})
                 until = relative_end
             else:  # rel == 'Next'
                 since = relative_end
-                until = relative_end + relativedelta(**{grain: int(num)})  # noqa: T400
+                until = relative_end + relativedelta(**{grain: int(num)})
     else:
         since = since or ''
         if since:
@@ -1002,16 +986,16 @@ def get_since_until(time_range: Optional[str] = None,
 
     if time_shift:
         time_shift = parse_human_timedelta(time_shift)
-        since = since if since is None else (since - time_shift)  # noqa: T400
-        until = until if until is None else (until - time_shift)  # noqa: T400
+        since = since if since is None else (since - time_shift)
+        until = until if until is None else (until - time_shift)
 
     if since and until and since > until:
         raise ValueError(_('From date cannot be larger than to date'))
 
-    return since, until  # noqa: T400
+    return since, until
 
 
-def add_ago_to_since(since: str) -> str:
+def add_ago_to_since(since):
     """
     Backwards compatibility hack. Without this slices with since: 7 days will
     be treated as 7 days in the future.
@@ -1086,17 +1070,17 @@ def split_adhoc_filters_into_base_filters(fd):
         fd['filters'] = simple_where_filters
 
 
-def get_username() -> Optional[str]:
+def get_username():
     """Get username if within the flask context, otherwise return noffin'"""
     try:
         return g.user.username
     except Exception:
-        return None
+        pass
 
 
-def MediumText() -> Variant:
+def MediumText():
     return Text().with_variant(MEDIUMTEXT(), 'mysql')
 
 
-def shortid() -> str:
+def shortid():
     return '{}'.format(uuid.uuid4())[-12:]

@@ -17,7 +17,6 @@
  * under the License.
  */
 import shortid from 'shortid';
-import JSONbig from 'json-bigint';
 import { t } from '@superset-ui/translation';
 import { SupersetClient } from '@superset-ui/connection';
 
@@ -129,11 +128,9 @@ export function fetchQueryResults(query) {
 
     return SupersetClient.get({
       endpoint: `/superset/results/${query.resultsKey}/`,
-      parseMethod: 'text',
     })
-      .then(({ text = '{}' }) => {
-        const bigIntJson = JSONbig.parse(text);
-        dispatch(querySuccess(query, bigIntJson));
+      .then(({ json = {} }) => {
+        dispatch(querySuccess(query, json));
       })
       .catch(response =>
         getClientErrorObject(response).then((error) => {
@@ -167,12 +164,10 @@ export function runQuery(query) {
       endpoint: `/superset/sql_json/${window.location.search}`,
       postPayload,
       stringify: false,
-      parseMethod: 'text',
     })
-      .then(({ text = '{}' }) => {
+      .then(({ json }) => {
         if (!query.runAsync) {
-          const bigIntJson = JSONbig.parse(text);
-          dispatch(querySuccess(query, bigIntJson));
+          dispatch(querySuccess(query, json));
         }
       })
       .catch(response =>
@@ -285,8 +280,7 @@ export function addTable(query, tableName, schemaName) {
       }),
     );
 
-    SupersetClient.get({ endpoint: encodeURI(`/superset/table/${query.dbId}/` +
-            `${encodeURIComponent(tableName)}/${encodeURIComponent(schemaName)}/`) })
+    SupersetClient.get({ endpoint: `/superset/table/${query.dbId}/${tableName}/${schemaName}/` })
       .then(({ json }) => {
         const dataPreviewQuery = {
           id: shortid.generate(),
@@ -323,8 +317,7 @@ export function addTable(query, tableName, schemaName) {
       );
 
     SupersetClient.get({
-      endpoint: encodeURI(`/superset/extra_table_metadata/${query.dbId}/` +
-          `${encodeURIComponent(tableName)}/${encodeURIComponent(schemaName)}/`),
+      endpoint: `/superset/extra_table_metadata/${query.dbId}/${tableName}/${schemaName}/`,
     })
       .then(({ json }) =>
         dispatch(mergeTable({ ...table, ...json, isExtraMetadataLoading: false })),

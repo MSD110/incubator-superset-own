@@ -30,7 +30,6 @@ const propTypes = {
   editMode: PropTypes.bool.isRequired,
   gridComponent: componentShape.isRequired,
   handleComponentDrop: PropTypes.func.isRequired,
-  isComponentVisible: PropTypes.bool.isRequired,
   resizeComponent: PropTypes.func.isRequired,
   width: PropTypes.number.isRequired,
 };
@@ -115,7 +114,6 @@ class DashboardGrid extends React.PureComponent {
       depth,
       editMode,
       width,
-      isComponentVisible,
     } = this.props;
 
     const columnPlusGutterWidth =
@@ -156,7 +154,6 @@ class DashboardGrid extends React.PureComponent {
               index={index}
               availableColumnCount={GRID_COLUMN_COUNT}
               columnWidth={columnWidth}
-              isComponentVisible={isComponentVisible}
               onResizeStart={this.handleResizeStart}
               onResize={this.handleResize}
               onResizeStop={this.handleResizeStop}

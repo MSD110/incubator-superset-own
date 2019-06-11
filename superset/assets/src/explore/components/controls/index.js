@@ -20,11 +20,11 @@ import AnnotationLayerControl from './AnnotationLayerControl';
 import BoundsControl from './BoundsControl';
 import CheckboxControl from './CheckboxControl';
 import CollectionControl from './CollectionControl';
-import ColorMapControl from './ColorMapControl';
 import ColorPickerControl from './ColorPickerControl';
 import ColorSchemeControl from './ColorSchemeControl';
 import DatasourceControl from './DatasourceControl';
 import DateFilterControl from './DateFilterControl';
+import DrillDownMetricsControl from './DrillDownMetricsControl';
 import FixedOrMetricControl from './FixedOrMetricControl';
 import HiddenControl from './HiddenControl';
 import SelectAsyncControl from './SelectAsyncControl';
@@ -37,6 +37,7 @@ import TimeSeriesColumnControl from './TimeSeriesColumnControl';
 import ViewportControl from './ViewportControl';
 import VizTypeControl from './VizTypeControl';
 import MetricsControl from './MetricsControl';
+import StepsControl from './StepsControl';
 import AdhocFilterControl from './AdhocFilterControl';
 import FilterPanel from './FilterPanel';
 import FilterBoxItemControl from './FilterBoxItemControl';
@@ -46,11 +47,11 @@ const controlMap = {
   BoundsControl,
   CheckboxControl,
   CollectionControl,
-  ColorMapControl,
   ColorPickerControl,
   ColorSchemeControl,
   DatasourceControl,
   DateFilterControl,
+  DrillDownMetricsControl,
   FixedOrMetricControl,
   HiddenControl,
   SelectAsyncControl,
@@ -63,6 +64,7 @@ const controlMap = {
   ViewportControl,
   VizTypeControl,
   MetricsControl,
+  StepsControl,
   AdhocFilterControl,
   FilterPanel,
   FilterBoxItemControl,

@@ -18,7 +18,7 @@
 import logging
 
 import sqlparse
-from sqlparse.sql import Identifier, IdentifierList, Token, TokenList
+from sqlparse.sql import Identifier, IdentifierList
 from sqlparse.tokens import Keyword, Name
 
 RESULT_OPERATIONS = {'UNION', 'INTERSECT', 'EXCEPT', 'SELECT'}
@@ -75,32 +75,32 @@ class ParsedQuery(object):
         return statements
 
     @staticmethod
-    def __get_full_name(tlist: TokenList):
-        if len(tlist.tokens) > 2 and tlist.tokens[1].value == '.':
-            return '{}.{}'.format(tlist.tokens[0].value,
-                                  tlist.tokens[2].value)
-        return tlist.get_real_name()
+    def __get_full_name(identifier):
+        if len(identifier.tokens) > 1 and identifier.tokens[1].value == '.':
+            return '{}.{}'.format(identifier.tokens[0].value,
+                                  identifier.tokens[2].value)
+        return identifier.get_real_name()
 
     @staticmethod
-    def __is_identifier(token: Token):
+    def __is_identifier(token):
         return isinstance(token, (IdentifierList, Identifier))
 
-    def __process_tokenlist(self, tlist: TokenList):
+    def __process_identifier(self, identifier):
         # exclude subselects
-        if '(' not in str(tlist):
-            table_name = self.__get_full_name(tlist)
-            if table_name and not table_name.startswith(CTE_PREFIX):
-                self._table_names.add(table_name)
+        if '(' not in str(identifier):
+            table_name = self.__get_full_name(identifier)
+            if not table_name.startswith(CTE_PREFIX):
+                self._table_names.add(self.__get_full_name(identifier))
             return
 
         # store aliases
-        if tlist.has_alias():
-            self._alias_names.add(tlist.get_alias())
-
-        # some aliases are not parsed properly
-        if tlist.tokens[0].ttype == Name:
-            self._alias_names.add(tlist.tokens[0].value)
-        self.__extract_from_token(tlist)
+        if hasattr(identifier, 'get_alias'):
+            self._alias_names.add(identifier.get_alias())
+        if hasattr(identifier, 'tokens'):
+            # some aliases are not parsed properly
+            if identifier.tokens[0].ttype == Name:
+                self._alias_names.add(identifier.tokens[0].value)
+        self.__extract_from_token(identifier)
 
     def as_create_table(self, table_name, overwrite=False):
         """Reformats the query into the create table as query.
@@ -127,6 +127,7 @@ class ParsedQuery(object):
         table_name_preceding_token = False
 
         for item in token.tokens:
+            logging.debug(('  ' * depth) + str(item.ttype) + str(item.value))
             if item.is_group and not self.__is_identifier(item):
                 self.__extract_from_token(item, depth=depth + 1)
 
@@ -144,31 +145,33 @@ class ParsedQuery(object):
 
             if table_name_preceding_token:
                 if isinstance(item, Identifier):
-                    self.__process_tokenlist(item)
+                    self.__process_identifier(item)
                 elif isinstance(item, IdentifierList):
                     for token in item.get_identifiers():
-                        if isinstance(token, TokenList):
-                            self.__process_tokenlist(token)
+                        self.__process_identifier(token)
             elif isinstance(item, IdentifierList):
                 for token in item.tokens:
                     if not self.__is_identifier(token):
                         self.__extract_from_token(item, depth=depth + 1)
 
+    def _get_limit_from_token(self, token):
+        if token.ttype == sqlparse.tokens.Literal.Number.Integer:
+            return int(token.value)
+        elif token.is_group:
+            return int(token.get_token_at_offset(1).value)
+
     def _extract_limit_from_query(self, statement):
-        idx, _ = statement.token_next_by(m=(Keyword, 'LIMIT'))
-        if idx is not None:
-            _, token = statement.token_next(idx=idx)
-            if token:
-                if isinstance(token, IdentifierList):
-                    _, token = token.token_next(idx=-1)
-                if token and token.ttype == sqlparse.tokens.Literal.Number.Integer:
-                    return int(token.value)
+        limit_token = None
+        for pos, item in enumerate(statement.tokens):
+            if item.ttype in Keyword and item.value.lower() == 'limit':
+                limit_token = statement.tokens[pos + 2]
+                return self._get_limit_from_token(limit_token)
 
     def get_query_with_new_limit(self, new_limit):
         """returns the query with the specified limit"""
         """does not change the underlying query"""
         if not self._limit:
-            return f'{self.sql}\nLIMIT {new_limit}'
+            return self.sql + ' LIMIT ' + str(new_limit)
         limit_pos = None
         tokens = self._parsed[0].tokens
         # Add all items to before_str until there is a limit

@@ -42,7 +42,7 @@ export default {
       label: t('Arc'),
       controlSetRows: [
         ['color_picker', 'target_color_picker'],
-        ['dimension', 'color_scheme', 'label_colors'],
+        ['dimension', 'color_scheme'],
         ['stroke_width', 'legend_position'],
       ],
     },

@@ -36,7 +36,6 @@ export default function() {
       type: DASHBOARD_GRID_TYPE,
       id: DASHBOARD_GRID_ID,
       children: [],
-      parents: [DASHBOARD_ROOT_ID],
     },
   };
 }

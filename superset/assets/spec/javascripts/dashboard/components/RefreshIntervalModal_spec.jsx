@@ -24,7 +24,6 @@ import RefreshIntervalModal from '../../../../src/dashboard/components/RefreshIn
 describe('RefreshIntervalModal', () => {
   const mockedProps = {
     triggerNode: <i className="fa fa-edit" />,
-    refreshFrequency: 10,
   };
   it('is valid', () => {
     expect(
@@ -34,9 +33,5 @@ describe('RefreshIntervalModal', () => {
   it('renders the trigger node', () => {
     const wrapper = mount(<RefreshIntervalModal {...mockedProps} />);
     expect(wrapper.find('.fa-edit')).toHaveLength(1);
-  });
-  it('should render a interval seconds', () => {
-    const wrapper = mount(<RefreshIntervalModal {...mockedProps} />);
-    expect(wrapper.prop('refreshFrequency')).toEqual(10);
   });
 });

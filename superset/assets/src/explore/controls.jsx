@@ -79,7 +79,6 @@ const D3_FORMAT_DOCS = 'D3 format syntax: https://github.com/d3/d3-format';
 
 // input choices & options
 const D3_FORMAT_OPTIONS = [
-  ['SMART_NUMBER', 'Adaptative formating'],
   ['.1s', '.1s (12345.432 => 10k)'],
   ['.3s', '.3s (12345.432 => 12.3k)'],
   [',.1%', ',.1% (12345.432 => 1,234,543.2%)'],
@@ -95,6 +94,7 @@ const ROW_LIMIT_OPTIONS = [10, 50, 100, 250, 500, 1000, 5000, 10000, 50000];
 const SERIES_LIMITS = [0, 5, 10, 25, 50, 100, 500];
 
 export const D3_TIME_FORMAT_OPTIONS = [
+  ['%a %b %d, %I %p', '%a %b %d, %I %p | Tue Sep 19, 05 PM'],
   ['smart_date', 'Adaptative formating'],
   ['%d/%m/%Y', '%d/%m/%Y | 14/01/2019'],
   ['%m/%d/%Y', '%m/%d/%Y | 01/14/2019'],
@@ -249,6 +249,23 @@ export const controls = {
     label: t('Percentage Metrics'),
     validators: [],
     description: t('Metrics for which percentage of total are to be displayed'),
+  },
+
+  drill_down_metrics: {
+    type: 'DrillDownMetricsControl',
+    mapStateToProps: (state) => {
+      const datasource = state.datasource;
+      return {
+        columns: datasource ? datasource.columns : [],
+        savedMetrics: datasource ? datasource.metrics : [],
+        datasourceType: datasource && datasource.type,
+      };
+    },
+    multi:false,
+    default: [],
+    label: t('Drill Down'),
+    validators: [],
+    description: t('Drill Down Metrics'),
   },
 
   y_axis_bounds: {
@@ -547,7 +564,6 @@ export const controls = {
     choices: [
       'Belgium',
       'Brazil',
-      'Bulgaria',
       'China',
       'Egypt',
       'France',
@@ -785,7 +801,7 @@ export const controls = {
     type: 'SelectControl',
     label: t('X Tick Layout'),
     choices: formatSelectOptions(['auto', 'flat', '45°', 'staggered']),
-    default: 'auto',
+    default: '45°',
     clearable: false,
     renderTrigger: true,
     description: t('The way the ticks are laid out on the X-axis'),
@@ -990,7 +1006,7 @@ export const controls = {
     freeForm: true,
     label: t('Number format'),
     renderTrigger: true,
-    default: 'SMART_NUMBER',
+    default: '.3s',
     choices: D3_FORMAT_OPTIONS,
     description: D3_FORMAT_DOCS,
   },
@@ -1233,7 +1249,7 @@ export const controls = {
     freeForm: true,
     label: t('X Axis Format'),
     renderTrigger: true,
-    default: 'SMART_NUMBER',
+    default: '.3s',
     choices: D3_FORMAT_OPTIONS,
     description: D3_FORMAT_DOCS,
   },
@@ -1253,7 +1269,7 @@ export const controls = {
     freeForm: true,
     label: t('Y Axis Format'),
     renderTrigger: true,
-    default: 'SMART_NUMBER',
+    default: '.3s',
     choices: D3_FORMAT_OPTIONS,
     description: D3_FORMAT_DOCS,
     mapStateToProps: (state) => {
@@ -1274,7 +1290,7 @@ export const controls = {
     type: 'SelectControl',
     freeForm: true,
     label: t('Right Axis Format'),
-    default: 'SMART_NUMBER',
+    default: '.3s',
     choices: D3_FORMAT_OPTIONS,
     description: D3_FORMAT_DOCS,
   },
@@ -1301,11 +1317,10 @@ export const controls = {
 
   rotation: {
     type: 'SelectControl',
-    label: t('Word Rotation'),
+    label: t('Rotation'),
     choices: formatSelectOptions(['random', 'flat', 'square']),
     renderTrigger: true,
-    default: 'square',
-    clearable: false,
+    default: 'flat',
     description: t('Rotation to apply to words in the cloud'),
   },
 
@@ -1353,7 +1368,7 @@ export const controls = {
       'mean',
       'min',
       'max',
-      'std',
+      'stdev',
       'var',
     ]),
     default: 'sum',
@@ -1387,7 +1402,7 @@ export const controls = {
   size_from: {
     type: 'TextControl',
     isInt: true,
-    label: t('Minimum Font Size'),
+    label: t('Font Size From'),
     renderTrigger: true,
     default: '20',
     description: t('Font size for the smallest value in the list'),
@@ -1396,72 +1411,10 @@ export const controls = {
   size_to: {
     type: 'TextControl',
     isInt: true,
-    label: t('Maximum Font Size'),
+    label: t('Font Size To'),
     renderTrigger: true,
     default: '150',
     description: t('Font size for the biggest value in the list'),
-  },
-
-  header_font_size: {
-    type: 'SelectControl',
-    label: t('Header Font Size'),
-    renderTrigger: true,
-    clearable: false,
-    default: 0.3,
-    // Values represent the percentage of space a header should take
-    options: [
-      {
-        label: t('Tiny'),
-        value: 0.125,
-      },
-      {
-        label: t('Small'),
-        value: 0.2,
-      },
-      {
-        label: t('Normal'),
-        value: 0.3,
-      },
-      {
-        label: t('Large'),
-        value: 0.4,
-      },
-      {
-        label: t('Huge'),
-        value: 0.5,
-      },
-    ],
-  },
-
-  subheader_font_size: {
-    type: 'SelectControl',
-    label: t('Subheader Font Size'),
-    renderTrigger: true,
-    clearable: false,
-    default: 0.125,
-    // Values represent the percentage of space a subheader should take
-    options: [
-      {
-        label: t('Tiny'),
-        value: 0.125,
-      },
-      {
-        label: t('Small'),
-        value: 0.2,
-      },
-      {
-        label: t('Normal'),
-        value: 0.3,
-      },
-      {
-        label: t('Large'),
-        value: 0.4,
-      },
-      {
-        label: t('Huge'),
-        value: 0.5,
-      },
-    ],
   },
 
   instant_filtering: {
@@ -1546,6 +1499,16 @@ export const controls = {
     renderTrigger: true,
     default: false,
     description: t('Whether to include a client-side search box'),
+  },
+
+  include_selectedrows: {
+    type: 'SelectControl',
+    freeForm: true,
+    renderTrigger: true,
+    label: t('Select Top Rows'),
+    default: 0,
+    choices: formatSelectOptions([0, 1, 2, 3, 4, 5, 6, 7, 8,9,10,15,20,25,30]),
+    description: t('To Include Top Rows, 0 means all the rows will be returned'),
   },
 
   table_filter: {
@@ -2025,13 +1988,46 @@ export const controls = {
     tabOverride: 'data',
   },
 
+  funnel_steps: {
+    type: 'StepsControl',
+    label: '',
+    default: [],
+    description: 'Steps',
+    renderTrigger: true,
+    tabOverride: 'data',
+    mapStateToProps: (state) => {
+        const datasource = state.datasource;
+        return {
+            columns: datasource ? datasource.columns : [],
+            savedMetrics: datasource ? datasource.metrics : [],
+            datasourceType: datasource && datasource.type,
+            datasource: state.datasource,
+        };
+    },
+  },
+
+  step_label: {
+    type: 'TextControl',
+    label: t('Label'),
+    renderTrigger: true,
+    default: '',
+  },
+
+  formatter: {
+      type: 'CheckboxControl',
+      label: t('Enable Formatter'),
+      renderTrigger: true,
+      default: true,
+      description: t('This enable formatter for the values for steps'),
+  },
+
   adhoc_filters: {
     type: 'AdhocFilterControl',
     label: t('Filters'),
     default: null,
     description: '',
     mapStateToProps: state => ({
-      columns: state.datasource ? state.datasource.columns.filter(c => c.filterable) : [],
+      columns: state.datasource ? state.datasource.columns : [],
       savedMetrics: state.datasource ? state.datasource.metrics : [],
       datasource: state.datasource,
     }),
@@ -2089,17 +2085,6 @@ export const controls = {
     choices: () => categoricalSchemeRegistry.keys().map(s => ([s, s])),
     description: t('The color scheme for rendering chart'),
     schemes: () => categoricalSchemeRegistry.getMap(),
-  },
-
-  label_colors: {
-    type: 'ColorMapControl',
-    label: t('Color Map'),
-    default: {},
-    renderTrigger: true,
-    mapStateToProps: state => ({
-      colorNamespace: state.form_data.color_namespace,
-      colorScheme: state.form_data.color_scheme,
-    }),
   },
 
   significance_level: {
@@ -2394,7 +2379,7 @@ export const controls = {
     type: 'CollectionControl',
     label: 'Filters',
     description: t('Filter configuration for the filter box'),
-    validators: [],
+    validators: [v.nonEmpty],
     controlName: 'FilterBoxItemControl',
     mapStateToProps: ({ datasource }) => ({ datasource }),
   },

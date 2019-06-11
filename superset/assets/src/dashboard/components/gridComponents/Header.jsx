@@ -23,7 +23,6 @@ import cx from 'classnames';
 import DragDroppable from '../dnd/DragDroppable';
 import DragHandle from '../dnd/DragHandle';
 import EditableTitle from '../../../components/EditableTitle';
-import AnchorLink from '../../../components/AnchorLink';
 import HoverMenu from '../menu/HoverMenu';
 import WithPopoverMenu from '../menu/WithPopoverMenu';
 import BackgroundStyleDropdown from '../menu/BackgroundStyleDropdown';
@@ -42,7 +41,6 @@ const propTypes = {
   parentComponent: componentShape.isRequired,
   index: PropTypes.number.isRequired,
   editMode: PropTypes.bool.isRequired,
-  filters: PropTypes.object.isRequired,
 
   // redux
   handleComponentDrop: PropTypes.func.isRequired,
@@ -103,7 +101,6 @@ class Header extends React.PureComponent {
       index,
       handleComponentDrop,
       editMode,
-      filters,
     } = this.props;
 
     const headerStyle = headerStyleOptions.find(
@@ -168,13 +165,6 @@ class Header extends React.PureComponent {
                   onSaveTitle={this.handleChangeText}
                   showTooltip={false}
                 />
-                {!editMode && (
-                  <AnchorLink
-                    anchorLinkId={component.id}
-                    filters={filters}
-                    showShortLinkButton
-                  />
-                )}
               </div>
             </WithPopoverMenu>
 

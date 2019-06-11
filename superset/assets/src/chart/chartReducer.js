@@ -47,6 +47,7 @@ export default function chartReducer(charts = {}, action) {
       return { ...state,
         chartStatus: 'success',
         queryResponse: action.queryResponse,
+        chartUpdateEndTime: now(),
         chartAlert: null,
       };
     },
@@ -71,7 +72,6 @@ export default function chartReducer(charts = {}, action) {
     [actions.CHART_RENDERING_SUCCEEDED](state) {
       return { ...state,
         chartStatus: 'rendered',
-        chartUpdateEndTime: now(),
       };
     },
     [actions.CHART_RENDERING_FAILED](state) {

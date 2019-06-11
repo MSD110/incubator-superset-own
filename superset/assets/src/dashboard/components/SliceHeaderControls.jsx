@@ -21,20 +21,14 @@ import PropTypes from 'prop-types';
 import moment from 'moment';
 import { Dropdown, MenuItem } from 'react-bootstrap';
 import { t } from '@superset-ui/translation';
-import URLShortLinkModal from '../../components/URLShortLinkModal';
-import getDashboardUrl from '../util/getDashboardUrl';
 
 const propTypes = {
   slice: PropTypes.object.isRequired,
-  componentId: PropTypes.string.isRequired,
-  filters: PropTypes.object.isRequired,
-  addDangerToast: PropTypes.func.isRequired,
   isCached: PropTypes.bool,
   isExpanded: PropTypes.bool,
   cachedDttm: PropTypes.string,
   updatedDttm: PropTypes.number,
   supersetCanExplore: PropTypes.bool,
-  supersetCanCSV: PropTypes.bool,
   sliceCanEdit: PropTypes.bool,
   toggleExpandSlice: PropTypes.func,
   forceRefresh: PropTypes.func,
@@ -52,7 +46,6 @@ const defaultProps = {
   isCached: false,
   isExpanded: false,
   supersetCanExplore: false,
-  supersetCanCSV: false,
   sliceCanEdit: false,
 };
 
@@ -102,15 +95,7 @@ class SliceHeaderControls extends React.PureComponent {
   }
 
   render() {
-    const {
-      slice,
-      isCached,
-      cachedDttm,
-      updatedDttm,
-      filters,
-      componentId,
-      addDangerToast,
-    } = this.props;
+    const { slice, isCached, cachedDttm, updatedDttm } = this.props;
     const cachedWhen = moment.utc(cachedDttm).fromNow();
     const updatedWhen = updatedDttm ? moment.utc(updatedDttm).fromNow() : '';
     const refreshTooltip = isCached
@@ -149,27 +134,13 @@ class SliceHeaderControls extends React.PureComponent {
             </MenuItem>
           )}
 
-          {this.props.supersetCanCSV && (
-            <MenuItem onClick={this.exportCSV}>{t('Export CSV')}</MenuItem>
-          )}
+          <MenuItem onClick={this.exportCSV}>{t('Export CSV')}</MenuItem>
 
           {this.props.supersetCanExplore && (
             <MenuItem onClick={this.exploreChart}>
               {t('Explore chart')}
             </MenuItem>
           )}
-
-          <URLShortLinkModal
-            url={getDashboardUrl(
-              window.location.pathname,
-              filters,
-              componentId,
-            )}
-            addDangerToast={addDangerToast}
-            isMenuItem
-            title={t('Share chart')}
-            triggerNode={<span>{t('Share chart')}</span>}
-          />
         </Dropdown.Menu>
       </Dropdown>
     );

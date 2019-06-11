@@ -45,7 +45,6 @@ from sqlalchemy import (
     Boolean, Column, DateTime, ForeignKey, Integer, String, Table, Text, UniqueConstraint,
 )
 from sqlalchemy.orm import backref, relationship
-from sqlalchemy_utils import EncryptedType
 
 from superset import conf, db, security_manager
 from superset.connectors.base.models import BaseColumn, BaseDatasource, BaseMetric
@@ -103,11 +102,9 @@ class DruidCluster(Model, AuditMixinNullable, ImportMixin):
     broker_endpoint = Column(String(255), default='druid/v2')
     metadata_last_refreshed = Column(DateTime)
     cache_timeout = Column(Integer)
-    broker_user = Column(String(255))
-    broker_pass = Column(EncryptedType(String(255), conf.get('SECRET_KEY')))
 
     export_fields = ('cluster_name', 'broker_host', 'broker_port',
-                     'broker_endpoint', 'cache_timeout', 'broker_user')
+                     'broker_endpoint', 'cache_timeout')
     update_from_object_fields = export_fields
     export_children = ['datasources']
 
@@ -142,20 +139,16 @@ class DruidCluster(Model, AuditMixinNullable, ImportMixin):
         cli = PyDruid(
             self.get_base_url(self.broker_host, self.broker_port),
             self.broker_endpoint)
-        if self.broker_user and self.broker_pass:
-            cli.set_basic_auth_credentials(self.broker_user, self.broker_pass)
         return cli
 
     def get_datasources(self):
         endpoint = self.get_base_broker_url() + '/datasources'
-        auth = requests.auth.HTTPBasicAuth(self.broker_user, self.broker_pass)
-        return json.loads(requests.get(endpoint, auth=auth).text)
+        return json.loads(requests.get(endpoint).text)
 
     def get_druid_version(self):
         endpoint = self.get_base_url(
             self.broker_host, self.broker_port) + '/status'
-        auth = requests.auth.HTTPBasicAuth(self.broker_user, self.broker_pass)
-        return json.loads(requests.get(endpoint, auth=auth).text)['version']
+        return json.loads(requests.get(endpoint).text)['version']
 
     @property
     @utils.memoized
@@ -269,7 +262,9 @@ class DruidColumn(Model, BaseColumn):
     __tablename__ = 'columns'
     __table_args__ = (UniqueConstraint('column_name', 'datasource_id'),)
 
-    datasource_id = Column(Integer, ForeignKey('datasources.id'))
+    datasource_id = Column(
+        Integer,
+        ForeignKey('datasources.id'))
     # Setting enable_typechecks=False disables polymorphic inheritance.
     datasource = relationship(
         'DruidDatasource',
@@ -285,7 +280,7 @@ class DruidColumn(Model, BaseColumn):
     export_parent = 'datasource'
 
     def __repr__(self):
-        return self.column_name or str(self.id)
+        return self.column_name
 
     @property
     def expression(self):
@@ -341,14 +336,15 @@ class DruidMetric(Model, BaseMetric):
 
     __tablename__ = 'metrics'
     __table_args__ = (UniqueConstraint('metric_name', 'datasource_id'),)
-    datasource_id = Column(Integer, ForeignKey('datasources.id'))
-
+    datasource_id = Column(
+        Integer,
+        ForeignKey('datasources.id'))
     # Setting enable_typechecks=False disables polymorphic inheritance.
     datasource = relationship(
         'DruidDatasource',
         backref=backref('metrics', cascade='all, delete-orphan'),
         enable_typechecks=False)
-    json = Column(Text, nullable=False)
+    json = Column(Text)
 
     export_fields = (
         'metric_name', 'verbose_name', 'metric_type', 'datasource_id',
@@ -414,7 +410,8 @@ class DruidDatasource(Model, BaseDatasource):
     baselink = 'druiddatasourcemodelview'
 
     # Columns
-    datasource_name = Column(String(255), nullable=False)
+    datasource_name = Column(String(255))
+    druid_datasource_name = Column(String(255))
     is_hidden = Column(Boolean, default=False)
     filter_select_enabled = Column(Boolean, default=True)  # override default
     fetch_values_from = Column(String(100))
@@ -424,6 +421,7 @@ class DruidDatasource(Model, BaseDatasource):
         'DruidCluster', backref='datasources', foreign_keys=[cluster_name])
     owners = relationship(owner_class, secondary=druiddatasource_user,
                           backref='druiddatasources')
+    UniqueConstraint('cluster_name', 'datasource_name')
 
     export_fields = (
         'datasource_name', 'is_hidden', 'description', 'default_endpoint',
@@ -450,6 +448,9 @@ class DruidDatasource(Model, BaseDatasource):
     @property
     def name(self):
         return self.datasource_name
+
+    def get_query_datasource_name(self):
+        return self.datasource_name if self.druid_datasource_name is None else self.druid_datasource_name
 
     @property
     def schema(self):
@@ -556,7 +557,7 @@ class DruidDatasource(Model, BaseDatasource):
         segment_metadata = None
         try:
             segment_metadata = client.segment_metadata(
-                datasource=self.datasource_name,
+                datasource=self.get_query_datasource_name(),
                 intervals=lbound + '/' + rbound,
                 merge=self.merge_flag,
                 analysisTypes=[])
@@ -572,7 +573,7 @@ class DruidDatasource(Model, BaseDatasource):
                 rbound = datetime(2050, 1, 1).isoformat()[:10]
             try:
                 segment_metadata = client.segment_metadata(
-                    datasource=self.datasource_name,
+                    datasource=self.get_query_datasource_name(),
                     intervals=lbound + '/' + rbound,
                     merge=self.merge_flag,
                     analysisTypes=[])
@@ -868,7 +869,7 @@ class DruidDatasource(Model, BaseDatasource):
             from_dttm = datetime(1970, 1, 1)
 
         qry = dict(
-            datasource=self.datasource_name,
+            datasource=self.get_query_datasource_name(),
             granularity='all',
             intervals=from_dttm.isoformat() + '/' + datetime.now().isoformat(),
             aggregations=dict(count=count('count')),
@@ -1092,7 +1093,7 @@ class DruidDatasource(Model, BaseDatasource):
         dimensions = self.get_dimensions(groupby, columns_dict)
         extras = extras or {}
         qry = dict(
-            datasource=self.datasource_name,
+            datasource=self.get_query_datasource_name(),
             dimensions=dimensions,
             aggregations=aggregations,
             granularity=DruidDatasource.granularity(
@@ -1118,8 +1119,7 @@ class DruidDatasource(Model, BaseDatasource):
             columns.append('__time')
             del qry['post_aggregations']
             del qry['aggregations']
-            del qry['dimensions']
-            qry['columns'] = columns
+            qry['dimensions'] = columns
             qry['metrics'] = []
             qry['granularity'] = 'all'
             qry['limit'] = row_limit
@@ -1148,9 +1148,7 @@ class DruidDatasource(Model, BaseDatasource):
                     pre_qry['aggregations'] = aggs_dict
                     pre_qry['post_aggregations'] = post_aggs_dict
             else:
-                agg_keys = qry['aggregations'].keys()
-                order_by = list(agg_keys)[0] if agg_keys else None
-
+                order_by = list(qry['aggregations'].keys())[0]
             # Limit on the number of timeseries, doing a two-phases query
             pre_qry['granularity'] = 'all'
             pre_qry['threshold'] = min(row_limit,

@@ -20,8 +20,7 @@ import shortid from 'shortid';
 
 import getToastsFromPyFlashMessages from '../../messageToasts/utils/getToastsFromPyFlashMessages';
 import { getChartKey } from '../exploreUtils';
-import { getControlsState } from '../store';
-import { getFormDataFromControls } from '../controlUtils';
+import { getControlsState, getFormDataFromControls } from '../store';
 
 export default function getInitialState(bootstrapData) {
   const controls = getControlsState(bootstrapData, bootstrapData.form_data);
@@ -53,14 +52,14 @@ export default function getInitialState(bootstrapData) {
       [chartKey]: {
         id: chartKey,
         chartAlert: null,
-        chartStatus: null,
+        chartStatus: 'loading',
         chartUpdateEndTime: null,
         chartUpdateStartTime: 0,
         latestQueryFormData: getFormDataFromControls(controls),
         sliceFormData,
         queryController: null,
         queryResponse: null,
-        triggerQuery: false,
+        triggerQuery: true,
         lastRendered: 0,
       },
     },

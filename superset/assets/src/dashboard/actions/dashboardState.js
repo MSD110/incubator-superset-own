@@ -32,7 +32,6 @@ import {
   addWarningToast,
   addDangerToast,
 } from '../../messageToasts/actions';
-import { UPDATE_COMPONENTS_PARENTS_LIST } from '../actions/dashboardLayout';
 
 export const SET_UNSAVED_CHANGES = 'SET_UNSAVED_CHANGES';
 export function setUnsavedChanges(hasUnsavedChanges) {
@@ -124,11 +123,6 @@ export function onSave() {
   return { type: ON_SAVE };
 }
 
-export const SET_REFRESH_FREQUENCY = 'SET_REFRESH_FREQUENCY';
-export function setRefreshFrequency(refreshFrequency) {
-  return { type: SET_REFRESH_FREQUENCY, refreshFrequency };
-}
-
 export function saveDashboardRequestSuccess() {
   return dispatch => {
     dispatch(onSave());
@@ -140,18 +134,19 @@ export function saveDashboardRequestSuccess() {
 export function saveDashboardRequest(data, id, saveType) {
   const path = saveType === SAVE_TYPE_OVERWRITE ? 'save_dash' : 'copy_dash';
 
-  return dispatch => {
-    dispatch({ type: UPDATE_COMPONENTS_PARENTS_LIST });
-
-    return SupersetClient.post({
+  return dispatch =>
+    SupersetClient.post({
       endpoint: `/superset/${path}/${id}/`,
       postPayload: { data },
     })
-      .then(response => {
-        dispatch(saveDashboardRequestSuccess());
-        dispatch(addSuccessToast(t('This dashboard was saved successfully.')));
-        return response;
-      })
+      .then(response =>
+        Promise.all([
+          dispatch(saveDashboardRequestSuccess()),
+          dispatch(
+            addSuccessToast(t('This dashboard was saved successfully.')),
+          ),
+        ]).then(() => Promise.resolve(response)),
+      )
       .catch(response =>
         getClientErrorObject(response).then(({ error }) =>
           dispatch(
@@ -163,7 +158,6 @@ export function saveDashboardRequest(data, id, saveType) {
           ),
         ),
       );
-  };
 }
 
 export function fetchCharts(chartList = [], force = false, interval = 0) {
@@ -226,9 +220,9 @@ export function startPeriodicRender(interval) {
   };
 }
 
-export const SHOW_BUILDER_PANE = 'SHOW_BUILDER_PANE';
-export function showBuilderPane(builderPaneType) {
-  return { type: SHOW_BUILDER_PANE, builderPaneType };
+export const TOGGLE_BUILDER_PANE = 'TOGGLE_BUILDER_PANE';
+export function toggleBuilderPane() {
+  return { type: TOGGLE_BUILDER_PANE };
 }
 
 export function addSliceToDashboard(id) {
@@ -242,10 +236,7 @@ export function addSliceToDashboard(id) {
         ),
       );
     }
-    const form_data = {
-      ...selectedSlice.form_data,
-      slice_id: selectedSlice.slice_id,
-    };
+    const form_data = selectedSlice.form_data;
     const newChart = {
       ...initChart,
       id,
@@ -264,18 +255,6 @@ export function removeSliceFromDashboard(id) {
   return dispatch => {
     dispatch(removeSlice(id));
     dispatch(removeChart(id));
-  };
-}
-
-export const SET_COLOR_SCHEME = 'SET_COLOR_SCHEME';
-export function setColorScheme(colorScheme) {
-  return { type: SET_COLOR_SCHEME, colorScheme };
-}
-
-export function setColorSchemeAndUnsavedChanges(colorScheme) {
-  return dispatch => {
-    dispatch(setColorScheme(colorScheme));
-    dispatch(setUnsavedChanges(true));
   };
 }
 

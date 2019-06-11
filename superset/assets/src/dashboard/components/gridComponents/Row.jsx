@@ -113,7 +113,6 @@ class Row extends React.PureComponent {
       onResizeStop,
       handleComponentDrop,
       editMode,
-      isComponentVisible,
     } = this.props;
 
     const rowItems = rowComponent.children || [];
@@ -178,7 +177,6 @@ class Row extends React.PureComponent {
                   onResizeStart={onResizeStart}
                   onResize={onResize}
                   onResizeStop={onResizeStop}
-                  isComponentVisible={isComponentVisible}
                 />
               ))}
 

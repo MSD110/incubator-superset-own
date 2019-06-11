@@ -85,7 +85,6 @@ describe('TableSelector', () => {
         .getTableNamesBySubStr('')
         .then((data) => {
           expect(data).toEqual({ options: [] });
-          return Promise.resolve();
         }));
 
     it('should handle table name', () => {
@@ -105,23 +104,6 @@ describe('TableSelector', () => {
         .then((data) => {
           expect(fetchMock.calls(GET_TABLE_NAMES_GLOB)).toHaveLength(1);
           expect(data).toEqual(mockTableOptions);
-          return Promise.resolve();
-        });
-    });
-
-    it('should escape schema and table names', () => {
-      const GET_TABLE_GLOB = 'glob:*/superset/tables/1/*/*';
-      const mockTableOptions = { options: [table] };
-      wrapper.setProps({ schema: 'slashed/schema' });
-      fetchMock.get(GET_TABLE_GLOB, mockTableOptions, { overwriteRoutes: true });
-
-      return wrapper
-        .instance()
-        .getTableNamesBySubStr('slashed/table')
-        .then(() => {
-          expect(fetchMock.lastUrl(GET_TABLE_GLOB))
-            .toContain('/slashed%252Fschema/slashed%252Ftable');
-          return Promise.resolve();
         });
     });
   });
@@ -143,7 +125,6 @@ describe('TableSelector', () => {
         .fetchTables(true, 'birth_names')
         .then(() => {
           expect(wrapper.state().tableOptions).toHaveLength(3);
-          return Promise.resolve();
         });
     });
 
@@ -157,7 +138,6 @@ describe('TableSelector', () => {
           expect(wrapper.state().tableOptions).toEqual([]);
           expect(wrapper.state().tableOptions).toHaveLength(0);
           expect(mockedProps.handleError.callCount).toBe(1);
-          return Promise.resolve();
         });
     });
   });

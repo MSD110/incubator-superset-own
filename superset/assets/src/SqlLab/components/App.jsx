@@ -71,18 +71,26 @@ class App extends React.PureComponent {
   render() {
     let content;
     if (this.state.hash) {
-      content = <QuerySearch height={this.state.contentHeight} actions={this.props.actions} />;
+      content = (
+        <div className="container-fluid">
+          <div className="row">
+            <div className="col-md-12">
+              <QuerySearch height={this.state.contentHeight} actions={this.props.actions} />
+            </div>
+          </div>
+        </div>
+      );
     } else {
       content = (
-        <React.Fragment>
+        <div>
           <QueryAutoRefresh />
           <TabbedSqlEditors />
-        </React.Fragment>
+        </div>
       );
     }
     return (
       <div className="App SqlLab">
-        {content}
+        <div className="container-fluid">{content}</div>
         <ToastPresenter />
       </div>
     );

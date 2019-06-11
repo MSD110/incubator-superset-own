@@ -37,7 +37,7 @@ export default {
       expanded: true,
       controlSetRows: [
         ['y_axis_format', null],
-        ['color_scheme', 'label_colors'],
+        ['color_scheme'],
       ],
     },
   ],

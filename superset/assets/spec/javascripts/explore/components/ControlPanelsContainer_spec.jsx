@@ -18,8 +18,7 @@
  */
 import React from 'react';
 import { shallow } from 'enzyme';
-import { defaultControls } from 'src/explore/store';
-import { getFormDataFromControls } from 'src/explore/controlUtils';
+import { getFormDataFromControls, defaultControls } from 'src/explore/store';
 import { ControlPanelsContainer } from 'src/explore/components/ControlPanelsContainer';
 import ControlPanelSection from 'src/explore/components/ControlPanelSection';
 import * as featureFlags from 'src/featureFlags';

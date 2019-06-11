@@ -33,11 +33,9 @@ import {
 
 const propTypes = {
   id: PropTypes.number.isRequired,
-  componentId: PropTypes.string.isRequired,
   width: PropTypes.number.isRequired,
   height: PropTypes.number.isRequired,
   updateSliceName: PropTypes.func.isRequired,
-  isComponentVisible: PropTypes.bool,
 
   // from redux
   chart: PropTypes.shape(chartPropShape).isRequired,
@@ -55,14 +53,11 @@ const propTypes = {
   isExpanded: PropTypes.bool.isRequired,
   isCached: PropTypes.bool,
   supersetCanExplore: PropTypes.bool.isRequired,
-  supersetCanCSV: PropTypes.bool.isRequired,
   sliceCanEdit: PropTypes.bool.isRequired,
-  addDangerToast: PropTypes.func.isRequired,
 };
 
 const defaultProps = {
   isCached: false,
-  isComponentVisible: true,
 };
 
 // we use state + shouldComponentUpdate() logic to prevent perf-wrecking
@@ -101,27 +96,19 @@ class Chart extends React.Component {
       return true;
     }
 
-    // allow chart update/re-render only if visible:
-    // under selected tab or no tab layout
-    if (nextProps.isComponentVisible) {
-      if (nextProps.chart.triggerQuery) {
+    for (let i = 0; i < SHOULD_UPDATE_ON_PROP_CHANGES.length; i += 1) {
+      const prop = SHOULD_UPDATE_ON_PROP_CHANGES[i];
+      if (nextProps[prop] !== this.props[prop]) {
         return true;
       }
+    }
 
-      for (let i = 0; i < SHOULD_UPDATE_ON_PROP_CHANGES.length; i += 1) {
-        const prop = SHOULD_UPDATE_ON_PROP_CHANGES[i];
-        if (nextProps[prop] !== this.props[prop]) {
-          return true;
-        }
-      }
-
-      if (
-        nextProps.width !== this.props.width ||
-        nextProps.height !== this.props.height
-      ) {
-        clearTimeout(this.resizeTimeout);
-        this.resizeTimeout = setTimeout(this.resize, RESIZE_TIMEOUT);
-      }
+    if (
+      nextProps.width !== this.props.width ||
+      nextProps.height !== this.props.height
+    ) {
+      clearTimeout(this.resizeTimeout);
+      this.resizeTimeout = setTimeout(this.resize, RESIZE_TIMEOUT);
     }
 
     return false;
@@ -196,7 +183,6 @@ class Chart extends React.Component {
   render() {
     const {
       id,
-      componentId,
       chart,
       slice,
       datasource,
@@ -209,9 +195,7 @@ class Chart extends React.Component {
       toggleExpandSlice,
       timeout,
       supersetCanExplore,
-      supersetCanCSV,
       sliceCanEdit,
-      addDangerToast,
     } = this.props;
 
     const { width } = this.state;
@@ -245,11 +229,7 @@ class Chart extends React.Component {
           updateSliceName={updateSliceName}
           sliceName={sliceName}
           supersetCanExplore={supersetCanExplore}
-          supersetCanCSV={supersetCanCSV}
           sliceCanEdit={sliceCanEdit}
-          componentId={componentId}
-          filters={filters}
-          addDangerToast={addDangerToast}
         />
 
         {/*

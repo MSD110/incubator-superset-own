@@ -21,37 +21,26 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { ScreenGridLayer } from 'deck.gl';
-import { t } from '@superset-ui/translation';
 import AnimatableDeckGLContainer from '../../AnimatableDeckGLContainer';
 import { getPlaySliderParams } from '../../../../modules/time';
 import sandboxedEval from '../../../../modules/sandbox';
 import { commonLayerProps, fitViewport } from '../common';
-import TooltipRow from '../../TooltipRow';
 
 function getPoints(data) {
   return data.map(d => d.position);
 }
 
-function setTooltipContent(o) {
-  return (
-    <div className="deckgl-tooltip">
-      <TooltipRow label={`${t('Longitude and Latitude')}: `} value={`${o.object.position[0]}, ${o.object.position[1]}`} />
-      <TooltipRow label={`${t('Weight')}: `} value={`${o.object.weight}`} />
-    </div>
-  );
-}
-
 export function getLayer(formData, payload, onAddFilter, setTooltip, filters) {
   const fd = formData;
-  const c = fd.color_picker;
+  const c = fd.colorPicker;
   let data = payload.data.features.map(d => ({
     ...d,
     color: [c.r, c.g, c.b, 255 * c.a],
   }));
 
-  if (fd.js_data_mutator) {
+  if (fd.jsDataMutator) {
     // Applying user defined data mutator if defined
-    const jsFnMutator = sandboxedEval(fd.js_data_mutator);
+    const jsFnMutator = sandboxedEval(fd.jsDataMutator);
     data = jsFnMutator(data);
   }
 
@@ -64,15 +53,15 @@ export function getLayer(formData, payload, onAddFilter, setTooltip, filters) {
   // Passing a layer creator function instead of a layer since the
   // layer needs to be regenerated at each render
   return new ScreenGridLayer({
-    id: `screengrid-layer-${fd.slice_id}`,
+    id: `screengrid-layer-${fd.sliceId}`,
     data,
     pickable: true,
-    cellSizePixels: fd.grid_size,
+    cellSizePixels: fd.gridSize,
     minColor: [c.r, c.g, c.b, 0],
     maxColor: [c.r, c.g, c.b, 255 * c.a],
     outline: false,
     getWeight: d => d.weight || 0,
-    ...commonLayerProps(fd, setTooltip, setTooltipContent),
+    ...commonLayerProps(fd, setTooltip),
   });
 }
 
@@ -113,7 +102,7 @@ class DeckGLScreenGrid extends React.PureComponent {
     // the granularity has to be read from the payload form_data, not the
     // props formData which comes from the instantaneous controls state
     const granularity = (
-      props.payload.form_data.time_grain_sqla ||
+      props.payload.form_data.timeGrainSqla ||
       props.payload.form_data.granularity ||
       'P1D'
     );
@@ -187,7 +176,7 @@ class DeckGLScreenGrid extends React.PureComponent {
           viewport={this.state.viewport}
           onViewportChange={this.onViewportChange}
           mapboxApiAccessToken={payload.data.mapboxApiKey}
-          mapStyle={formData.mapbox_style}
+          mapStyle={formData.mapboxStyle}
           setControlValue={setControlValue}
           aggregation
         />

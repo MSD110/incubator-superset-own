@@ -33,7 +33,7 @@ export default {
       label: t('Chart Options'),
       expanded: true,
       controlSetRows: [
-        ['color_scheme', 'label_colors'],
+        ['color_scheme'],
         ['number_format', 'date_time_format'],
         ['partition_limit', 'partition_threshold'],
         ['log_scale', 'equal_date_size'],

@@ -42,7 +42,7 @@ export const datasourceAndVizType = {
 export const colorScheme = {
   label: t('Color Scheme'),
   controlSetRows: [
-    ['color_scheme', 'label_colors'],
+    ['color_scheme'],
   ],
 };
 
@@ -69,6 +69,14 @@ export const annotations = {
   expanded: true,
   controlSetRows: [
     ['annotation_layers'],
+  ],
+};
+
+export const steps = {
+  label: t('Steps'),
+  expanded: true,
+  controlSetRows: [
+    ['funnel_steps'],
   ],
 };
 

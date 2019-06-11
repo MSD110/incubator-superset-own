@@ -57,7 +57,7 @@ describe('TableElement', () => {
     expect(wrapper.find(ColumnElement).first().props().column.name).toBe('id');
     wrapper.find('.sort-cols').simulate('click');
     expect(wrapper.state().sortColumns).toBe(true);
-    expect(wrapper.find(ColumnElement).first().props().column.name).toBe('active');
+    expect(wrapper.find(ColumnElement).first().props().column.name).toBe('last_login');
   });
   it('calls the collapseTable action', () => {
     const wrapper = mount(<TableElement {...mockedProps} />);

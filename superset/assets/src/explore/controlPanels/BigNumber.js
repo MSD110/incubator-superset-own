@@ -29,30 +29,19 @@ export default {
       ],
     },
     {
-      label: t('Options'),
+      label: t('Chart Options'),
       expanded: true,
       controlSetRows: [
         ['compare_lag', 'compare_suffix'],
         ['y_axis_format', null],
         ['show_trend_line', 'start_y_axis_at_zero'],
-      ],
-    },
-    {
-      label: t('Chart Options'),
-      expanded: true,
-      controlSetRows: [
         ['color_picker', null],
-        ['header_font_size'],
-        ['subheader_font_size'],
       ],
     },
   ],
   controlOverrides: {
     y_axis_format: {
       label: t('Number format'),
-    },
-    header_font_size: {
-      label: t('Big Number Font Size'),
     },
   },
 };

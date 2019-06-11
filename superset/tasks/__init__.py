@@ -16,4 +16,3 @@
 # specific language governing permissions and limitations
 # under the License.
 from . import schedules # noqa
-from . import cache # noqa

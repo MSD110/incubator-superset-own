@@ -163,7 +163,7 @@ class Slice(Model, AuditMixinNullable, ImportMixin):
                      'viz_type', 'params', 'cache_timeout')
 
     def __repr__(self):
-        return self.slice_name or str(self.id)
+        return self.slice_name
 
     @property
     def cls_model(self):
@@ -243,7 +243,6 @@ class Slice(Model, AuditMixinNullable, ImportMixin):
             'slice_name': self.slice_name,
             'slice_url': self.slice_url,
             'modified': self.modified(),
-            'changed_on_humanized': self.changed_on_humanized,
             'changed_on': self.changed_on.isoformat(),
         }
 
@@ -293,13 +292,9 @@ class Slice(Model, AuditMixinNullable, ImportMixin):
         return '/chart/edit/{}'.format(self.id)
 
     @property
-    def chart(self):
-        return self.slice_name or '<empty>'
-
-    @property
     def slice_link(self):
         url = self.slice_url
-        name = escape(self.chart)
+        name = escape(self.slice_name)
         return Markup(f'<a href="{url}">{name}</a>')
 
     def get_viz(self, force=False):
@@ -412,7 +407,7 @@ class Dashboard(Model, AuditMixinNullable, ImportMixin):
                      'description', 'css', 'slug')
 
     def __repr__(self):
-        return self.dashboard_title or str(self.id)
+        return self.dashboard_title
 
     @property
     def table_names(self):
@@ -442,17 +437,13 @@ class Dashboard(Model, AuditMixinNullable, ImportMixin):
         return {slc.datasource for slc in self.slices}
 
     @property
-    def charts(self):
-        return [slc.chart for slc in self.slices]
-
-    @property
     def sqla_metadata(self):
         # pylint: disable=no-member
         metadata = MetaData(bind=self.get_sqla_engine())
         return metadata.reflect()
 
     def dashboard_link(self):
-        title = escape(self.dashboard_title or '<empty>')
+        title = escape(self.dashboard_title)
         return Markup(f'<a href="{self.url}">{title}</a>')
 
     @property
@@ -748,10 +739,6 @@ class Database(Model, AuditMixinNullable, ImportMixin):
     @property
     def table_cache_timeout(self):
         return self.metadata_cache_timeout.get('table_cache_timeout')
-
-    @property
-    def default_schemas(self):
-        return self.get_extra().get('default_schemas', [])
 
     @classmethod
     def get_password_masked_url_from_uri(cls, uri):
@@ -1075,7 +1062,7 @@ class Database(Model, AuditMixinNullable, ImportMixin):
             autoload_with=self.get_sqla_engine())
 
     def get_columns(self, table_name, schema=None):
-        return self.db_engine_spec.get_columns(self.inspector, table_name, schema)
+        return self.inspector.get_columns(table_name, schema)
 
     def get_indexes(self, table_name, schema=None):
         return self.inspector.get_indexes(table_name, schema)

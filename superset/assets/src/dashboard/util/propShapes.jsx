@@ -72,10 +72,7 @@ export const dashboardStatePropShape = PropTypes.shape({
   filters: PropTypes.object.isRequired,
   expandedSlices: PropTypes.object,
   editMode: PropTypes.bool,
-  builderPaneType: PropTypes.string.isRequired,
-  colorNamespace: PropTypes.string,
-  colorScheme: PropTypes.string,
-  updatedColorScheme: PropTypes.bool,
+  showBuilderPane: PropTypes.bool,
   hasUnsavedChanges: PropTypes.bool,
 });
 

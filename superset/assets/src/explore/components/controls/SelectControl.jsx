@@ -92,24 +92,25 @@ export default class SelectControl extends React.PureComponent {
 
   onChange(opt) {
     let optionValue = null;
-    if (opt) {
-      if (this.props.multi) {
-        optionValue = [];
-        for (const o of opt) {
-          if (o.meta === true) {
-            optionValue = this.getOptions(this.props)
-                              .filter(x => !x.meta)
-                              .map(x => x[this.props.valueKey]);
-            break;
-          } else {
-            optionValue.push(o[this.props.valueKey]);
-          }
+    if (!opt) {
+      return;
+    }
+    if (this.props.multi) {
+      optionValue = [];
+      for (const o of opt) {
+        if (o.meta === true) {
+          optionValue = this.getOptions(this.props)
+                            .filter(x => !x.meta)
+                            .map(x => x[this.props.valueKey]);
+          break;
+        } else {
+          optionValue.push(o[this.props.valueKey]);
         }
-      } else if (opt.meta === true) {
-        return;
-      } else {
-        optionValue = opt[this.props.valueKey];
       }
+    } else if (opt.meta === true) {
+      return;
+    } else {
+      optionValue = opt[this.props.valueKey];
     }
     this.props.onChange(optionValue);
   }

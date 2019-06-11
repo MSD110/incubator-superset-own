@@ -28,7 +28,7 @@ export default {
       label: t('Chart Options'),
       expanded: true,
       controlSetRows: [
-        ['color_scheme', 'label_colors'],
+        ['color_scheme'],
         ['show_brush', 'send_time_range', 'show_legend'],
         ['rich_tooltip', 'show_markers'],
         ['line_interpolation'],
@@ -58,7 +58,7 @@ export default {
   controlOverrides: {
     x_axis_format: {
       choices: D3_TIME_FORMAT_OPTIONS,
-      default: 'smart_date',
+      default: '%a %b %d, %I %p',
     },
     row_limit: {
       default: 50000,

@@ -36,7 +36,6 @@ const propTypes = {
   bsSize: PropTypes.string,
   className: PropTypes.string,
   tooltip: PropTypes.string,
-  backdrop: PropTypes.oneOf(['static', true, false]),
 };
 
 const defaultProps = {
@@ -78,7 +77,6 @@ export default class ModalTrigger extends React.Component {
         onExit={this.props.onExit}
         bsSize={this.props.bsSize}
         className={this.props.className}
-        backdrop={this.props.backdrop}
       >
         {this.props.modalTitle &&
           <Modal.Header closeButton>

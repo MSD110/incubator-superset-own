@@ -21,8 +21,6 @@
 export enum FeatureFlag {
   SCOPED_FILTER = 'SCOPED_FILTER',
   OMNIBAR = 'OMNIBAR',
-  CLIENT_CACHE = 'CLIENT_CACHE',
-  SCHEDULED_QUERIES = 'SCHEDULED_QUERIES',
 }
 
 export type FeatureFlagMap = {
@@ -40,5 +38,5 @@ export function initFeatureFlags(featureFlags: FeatureFlagMap) {
 }
 
 export function isFeatureEnabled(feature: FeatureFlag) {
-  return window && window.featureFlags && !!window.featureFlags[feature];
+  return !!window.featureFlags[feature];
 }

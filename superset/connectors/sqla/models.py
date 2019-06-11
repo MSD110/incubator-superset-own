@@ -100,7 +100,7 @@ class TableColumn(Model, BaseColumn):
         backref=backref('columns', cascade='all, delete-orphan'),
         foreign_keys=[table_id])
     is_dttm = Column(Boolean, default=False)
-    expression = Column(Text)
+    expression = Column(Text, default='')
     python_date_format = Column(String(255))
     database_expression = Column(String(255))
 
@@ -209,7 +209,7 @@ class SqlMetric(Model, BaseMetric):
         'SqlaTable',
         backref=backref('metrics', cascade='all, delete-orphan'),
         foreign_keys=[table_id])
-    expression = Column(Text, nullable=False)
+    expression = Column(Text)
 
     export_fields = (
         'metric_name', 'verbose_name', 'metric_type', 'table_id', 'expression',
@@ -478,12 +478,17 @@ class SqlaTable(Model, BaseDatasource):
             table=self, database=self.database, **kwargs)
 
     def get_query_str_extended(self, query_obj):
+
+        #print("________ex_____", query_obj)
+
         sqlaq = self.get_sqla_query(**query_obj)
         sql = self.database.compile_sqla_query(sqlaq.sqla_query)
         logging.info(sql)
         sql = sqlparse.format(sql, reindent=True)
+
         if query_obj['is_prequery']:
             query_obj['prequeries'].append(sql)
+
         sql = self.mutate_query_from_config(sql)
         return QueryStringExtended(labels_expected=sqlaq.labels_expected, sql=sql)
 
@@ -885,7 +890,6 @@ class SqlaTable(Model, BaseDatasource):
         M = SqlMetric  # noqa
         metrics = []
         any_date_col = None
-        db_engine_spec = self.database.db_engine_spec
         db_dialect = self.database.get_dialect()
         dbcols = (
             db.session.query(TableColumn)
@@ -908,7 +912,6 @@ class SqlaTable(Model, BaseDatasource):
                 dbcol.sum = dbcol.is_num
                 dbcol.avg = dbcol.is_num
                 dbcol.is_dttm = dbcol.is_time
-                db_engine_spec.alter_new_orm_column(dbcol)
             else:
                 dbcol.type = datatype
             dbcol.groupby = True

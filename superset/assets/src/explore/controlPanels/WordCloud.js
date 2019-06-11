@@ -17,7 +17,6 @@
  * under the License.
  */
 import { t } from '@superset-ui/translation';
-import { nonEmpty } from '../validators';
 
 export default {
   controlPanelSections: [
@@ -33,27 +32,11 @@ export default {
     },
     {
       label: t('Options'),
-      expanded: true,
       controlSetRows: [
         ['size_from', 'size_to'],
         ['rotation'],
-        ['color_scheme', 'label_colors'],
+        ['color_scheme'],
       ],
     },
   ],
-  controlOverrides: {
-    series: {
-      validators: [nonEmpty],
-      clearable: false,
-    },
-    row_limit: {
-      default: 100,
-    },
-    size_from: {
-      default: 10,
-    },
-    size_to: {
-      default: 70,
-    },
-  },
 };
