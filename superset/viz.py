@@ -2597,48 +2597,48 @@ class BaseDeckGLViz(BaseViz):
         raise NotImplementedError()
 
 
-# class DeckScatterViz(BaseDeckGLViz):
-#     """deck.gl's ScatterLayer"""
-#
-#     viz_type = 'deck_scatter'
-#     verbose_name = _('Deck.gl - Scatter plot')
-#     spatial_control_keys = ['spatial']
-#     is_timeseries = True
-#
-#     def query_obj(self):
-#         fd = self.form_data
-#         self.is_timeseries = bool(
-#             fd.get('time_grain_sqla') or fd.get('granularity'))
-#         self.point_radius_fixed = (
-#             fd.get('point_radius_fixed') or {'type': 'fix', 'value': 500})
-#         return super(DeckScatterViz, self).query_obj()
-#
-#     def get_metrics(self):
-#         self.metric = None
-#         if self.point_radius_fixed.get('type') == 'metric':
-#             self.metric = self.point_radius_fixed.get('value')
-#             return [self.metric]
-#         return None
-#
-#     def get_properties(self, d):
-#         return {
-#             'metric': d.get(self.metric_label),
-#             'radius': self.fixed_value if self.fixed_value else d.get(self.metric_label),
-#             'cat_color': d.get(self.dim) if self.dim else None,
-#             'position': d.get('spatial'),
-#             DTTM_ALIAS: d.get(DTTM_ALIAS),
-#         }
-#
-#     def get_data(self, df):
-#         fd = self.form_data
-#         self.metric_label = \
-#             utils.get_metric_name(self.metric) if self.metric else None
-#         self.point_radius_fixed = fd.get('point_radius_fixed')
-#         self.fixed_value = None
-#         self.dim = self.form_data.get('dimension')
-#         if self.point_radius_fixed.get('type') != 'metric':
-#             self.fixed_value = self.point_radius_fixed.get('value')
-#         return super(DeckScatterViz, self).get_data(df)
+class DeckScatterViz(BaseDeckGLViz):
+    """deck.gl's ScatterLayer"""
+
+    viz_type = 'deck_scatter'
+    verbose_name = _('Deck.gl - Scatter plot')
+    spatial_control_keys = ['spatial']
+    is_timeseries = True
+
+    def query_obj(self):
+        fd = self.form_data
+        self.is_timeseries = bool(
+            fd.get('time_grain_sqla') or fd.get('granularity'))
+        self.point_radius_fixed = (
+            fd.get('point_radius_fixed') or {'type': 'fix', 'value': 500})
+        return super(DeckScatterViz, self).query_obj()
+
+    def get_metrics(self):
+        self.metric = None
+        if self.point_radius_fixed.get('type') == 'metric':
+            self.metric = self.point_radius_fixed.get('value')
+            return [self.metric]
+        return None
+
+    def get_properties(self, d):
+        return {
+            'metric': d.get(self.metric_label),
+            'radius': self.fixed_value if self.fixed_value else d.get(self.metric_label),
+            'cat_color': d.get(self.dim) if self.dim else None,
+            'position': d.get('spatial'),
+            DTTM_ALIAS: d.get(DTTM_ALIAS),
+        }
+
+    def get_data(self, df):
+        fd = self.form_data
+        self.metric_label = \
+            utils.get_metric_name(self.metric) if self.metric else None
+        self.point_radius_fixed = fd.get('point_radius_fixed')
+        self.fixed_value = None
+        self.dim = self.form_data.get('dimension')
+        if self.point_radius_fixed.get('type') != 'metric':
+            self.fixed_value = self.point_radius_fixed.get('value')
+        return super(DeckScatterViz, self).get_data(df)
 
 
 class DeckScreengrid(BaseDeckGLViz):
