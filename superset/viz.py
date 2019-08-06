@@ -2684,15 +2684,15 @@ class DeckGrid(BaseDeckGLViz):
         return super(DeckGrid, self).get_data(df)
 
 
-def geohash_to_json(geohash_code):
-    p = geohash.bbox(geohash_code)
-    return [
-        [p.get('w'), p.get('n')],
-        [p.get('e'), p.get('n')],
-        [p.get('e'), p.get('s')],
-        [p.get('w'), p.get('s')],
-        [p.get('w'), p.get('n')],
-    ]
+# def geohash_to_json(geohash_code):
+#     p = geohash.bbox(geohash_code)
+#     return [
+#         [p.get('w'), p.get('n')],
+#         [p.get('e'), p.get('n')],
+#         [p.get('e'), p.get('s')],
+#         [p.get('w'), p.get('s')],
+#         [p.get('w'), p.get('n')],
+#     ]
 
 
 class DeckPathViz(BaseDeckGLViz):
