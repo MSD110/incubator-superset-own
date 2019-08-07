@@ -2413,29 +2413,29 @@ class MapboxViz(BaseViz):
         }
 
 
-# class DeckGLMultiLayer(BaseViz):
-#     """Pile on multiple DeckGL layers"""
-#
-#     viz_type = 'deck_multi'
-#     verbose_name = _('Deck.gl - Multiple Layers')
-#
-#     is_timeseries = False
-#     credits = '<a href="https://uber.github.io/deck.gl/">deck.gl</a>'
-#
-#     def query_obj(self):
-#         return None
-#
-#     def get_data(self, df):
-#         fd = self.form_data
-#         # Late imports to avoid circular import issues
-#         from superset.models.core import Slice
-#         from superset import db
-#         slice_ids = fd.get('deck_slices')
-#         slices = db.session.query(Slice).filter(Slice.id.in_(slice_ids)).all()
-#         return {
-#             'mapboxApiKey': config.get('MAPBOX_API_KEY'),
-#             'slices': [slc.data for slc in slices],
-#         }
+class DeckGLMultiLayer(BaseViz):
+    """Pile on multiple DeckGL layers"""
+
+    viz_type = 'deck_multi'
+    verbose_name = _('Deck.gl - Multiple Layers')
+
+    is_timeseries = False
+    credits = '<a href="https://uber.github.io/deck.gl/">deck.gl</a>'
+
+    def query_obj(self):
+        return None
+
+    def get_data(self, df):
+        fd = self.form_data
+        # Late imports to avoid circular import issues
+        from superset.models.core import Slice
+        from superset import db
+        slice_ids = fd.get('deck_slices')
+        slices = db.session.query(Slice).filter(Slice.id.in_(slice_ids)).all()
+        return {
+            'mapboxApiKey': config.get('MAPBOX_API_KEY'),
+            'slices': [slc.data for slc in slices],
+        }
 
 
 class BaseDeckGLViz(BaseViz):
