@@ -70,508 +70,508 @@ global_flag = False
 global_query = {}
 
 
-# class BaseViz(object):
-#
-#     """All visualizations derive this base class"""
-#
-#     viz_type = None
-#     verbose_name = 'Base Viz'
-#     credits = ''
-#     is_timeseries = False
-#     default_fillna = 0
-#     cache_type = 'df'
-#     enforce_numerical_metrics = True
-#
-#     def __init__(self, datasource, form_data, force=False):
-#         if not datasource:
-#             raise Exception(_('Viz is missing a datasource'))
-#
-#         self.datasource = datasource
-#         self.request = request
-#         self.viz_type = form_data.get('viz_type')
-#         self.form_data = form_data
-#
-#         self.query = ''
-#         self.token = self.form_data.get(
-#             'token', 'token_' + uuid.uuid4().hex[:8])
-#
-#         self.groupby = self.form_data.get('groupby') or []
-#         self.time_shift = timedelta()
-#
-#         self.status = None
-#         self.error_msg = ''
-#         self.results = None
-#         self.error_message = None
-#         self.force = force
-#
-#         # Keeping track of whether some data came from cache
-#         # this is useful to trigger the <CachedLabel /> when
-#         # in the cases where visualization have many queries
-#         # (FilterBox for instance)
-#         self._some_from_cache = False
-#         self._any_cache_key = None
-#         self._any_cached_dttm = None
-#         self._extra_chart_data = []
-#
-#         self.process_metrics()
-#
-#     def process_metrics(self):
-#         # metrics in TableViz is order sensitive, so metric_dict should be
-#         # OrderedDict
-#         self.metric_dict = OrderedDict()
-#         fd = self.form_data
-#         for mkey in METRIC_KEYS:
-#             val = fd.get(mkey)
-#             if val:
-#                 if not isinstance(val, list):
-#                     val = [val]
-#                 for o in val:
-#                     label = utils.get_metric_name(o)
-#                     self.metric_dict[label] = o
-#
-#         # Cast to list needed to return serializable object in py3
-#         self.all_metrics = list(self.metric_dict.values())
-#         self.metric_labels = list(self.metric_dict.keys())
-#
-#     @staticmethod
-#     def handle_js_int_overflow(data):
-#         for d in data.get('records', dict()):
-#             for k, v in list(d.items()):
-#                 if isinstance(v, int):
-#                     # if an int is too big for Java Script to handle
-#                     # convert it to a string
-#                     if abs(v) > JS_MAX_INTEGER:
-#                         d[k] = str(v)
-#         return data
-#
-#     def run_extra_queries(self):
-#         """Lifecycle method to use when more than one query is needed
-#
-#         In rare-ish cases, a visualization may need to execute multiple
-#         queries. That is the case for FilterBox or for time comparison
-#         in Line chart for instance.
-#
-#         In those cases, we need to make sure these queries run before the
-#         main `get_payload` method gets called, so that the overall caching
-#         metadata can be right. The way it works here is that if any of
-#         the previous `get_df_payload` calls hit the cache, the main
-#         payload's metadata will reflect that.
-#
-#         The multi-query support may need more work to become a first class
-#         use case in the framework, and for the UI to reflect the subtleties
-#         (show that only some of the queries were served from cache for
-#         instance). In the meantime, since multi-query is rare, we treat
-#         it with a bit of a hack. Note that the hack became necessary
-#         when moving from caching the visualization's data itself, to caching
-#         the underlying query(ies).
-#         """
-#         pass
-#
-#     def handle_nulls(self, df):
-#         fillna = self.get_fillna_for_columns(df.columns)
-#         return df.fillna(fillna)
-#
-#     def get_fillna_for_col(self, col):
-#         """Returns the value to use as filler for a specific Column.type"""
-#         if col:
-#             if col.is_string:
-#                 return ' NULL'
-#         return self.default_fillna
-#
-#     def get_fillna_for_columns(self, columns=None):
-#         """Returns a dict or scalar that can be passed to DataFrame.fillna"""
-#         if columns is None:
-#             return self.default_fillna
-#         columns_dict = {col.column_name: col for col in self.datasource.columns}
-#         fillna = {
-#             c: self.get_fillna_for_col(columns_dict.get(c))
-#             for c in columns
-#         }
-#         return fillna
-#
-#     def get_samples(self):
-#         query_obj = self.query_obj()
-#         query_obj.update({
-#             'groupby': [],
-#             'metrics': [],
-#             'row_limit': 1000,
-#             'columns': [o.column_name for o in self.datasource.columns],
-#         })
-#         df = self.get_df(query_obj)
-#         return df.to_dict(orient='records')
-#
-#     def get_df(self, query_obj=None):
-#         """Returns a pandas dataframe based on the query object"""
-#         if not query_obj:
-#             query_obj = self.query_obj()
-#         if not query_obj:
-#             return None
-#
-#         self.error_msg = ''
-#
-#         timestamp_format = None
-#         if self.datasource.type == 'table':
-#             dttm_col = self.datasource.get_col(query_obj['granularity'])
-#             if dttm_col:
-#                 timestamp_format = dttm_col.python_date_format
-#
-#         # The datasource here can be different backend but the interface is common
-#         self.results = self.datasource.query(query_obj)
-#         self.query = self.results.query
-#         self.status = self.results.status
-#         self.error_message = self.results.error_message
-#
-#         df = self.results.df
-#         # Transform the timestamp we received from database to pandas supported
-#         # datetime format. If no python_date_format is specified, the pattern will
-#         # be considered as the default ISO date format
-#         # If the datetime format is unix, the parse will use the corresponding
-#         # parsing logic.
-#         if df is not None and not df.empty:
-#             if DTTM_ALIAS in df.columns:
-#                 if timestamp_format in ('epoch_s', 'epoch_ms'):
-#                     # Column has already been formatted as a timestamp.
-#                     dttm_col = df[DTTM_ALIAS]
-#                     one_ts_val = dttm_col[0]
-#
-#                     # convert time column to pandas Timestamp, but different
-#                     # ways to convert depending on string or int types
-#                     try:
-#                         int(one_ts_val)
-#                         is_integral = True
-#                     except ValueError:
-#                         is_integral = False
-#                     if is_integral:
-#                         unit = 's' if timestamp_format == 'epoch_s' else 'ms'
-#                         df[DTTM_ALIAS] = pd.to_datetime(dttm_col, utc=False, unit=unit,
-#                                                         origin='unix')
-#                     else:
-#                         df[DTTM_ALIAS] = dttm_col.apply(pd.Timestamp)
-#                 else:
-#                     df[DTTM_ALIAS] = pd.to_datetime(
-#                         df[DTTM_ALIAS], utc=False, format=timestamp_format)
-#                 if self.datasource.offset:
-#                     df[DTTM_ALIAS] += timedelta(hours=self.datasource.offset)
-#                 df[DTTM_ALIAS] += self.time_shift
-#
-#             if self.enforce_numerical_metrics:
-#                 self.df_metrics_to_num(df)
-#
-#             df.replace([np.inf, -np.inf], np.nan)
-#             df = self.handle_nulls(df)
-#
-#         # global global_flag
-#         # if global_flag:
-#         #     df = df.from_dict(global_dd)
-#         #     global_flag = False
-#
-#         # logging.debug("____base_get_df________",df)
-#
-#         return df
-#
-#     def df_metrics_to_num(self, df):
-#         """Converting metrics to numeric when pandas.read_sql cannot"""
-#         metrics = self.metric_labels
-#         for col, dtype in df.dtypes.items():
-#             if dtype.type == np.object_ and col in metrics:
-#                 df[col] = pd.to_numeric(df[col], errors='coerce')
-#
-#     def process_query_filters(self):
-#         utils.convert_legacy_filters_into_adhoc(self.form_data)
-#         merge_extra_filters(self.form_data)
-#         utils.split_adhoc_filters_into_base_filters(self.form_data)
-#
-#     def query_obj(self):
-#         """Building a query object"""
-#         # print("_____________BaseViz_____Query_obj____________\n",self.form_data)
-#
-#         # for updateed form data
-#         self.process_metrics()
-#
-#         form_data = self.form_data
-#         self.process_query_filters()
-#         gb = form_data.get('groupby') or []
-#         metrics = self.all_metrics or []
-#         columns = form_data.get('columns') or []
-#         groupby = []
-#         for o in gb + columns:
-#             if o not in groupby:
-#                 groupby.append(o)
-#
-#         # print("_________", groupby, "\n",self.all_metrics)
-#
-#         is_timeseries = self.is_timeseries
-#         if DTTM_ALIAS in groupby:
-#             groupby.remove(DTTM_ALIAS)
-#             is_timeseries = True
-#
-#         granularity = (
-#             form_data.get('granularity') or
-#             form_data.get('granularity_sqla')
-#         )
-#         limit = int(form_data.get('limit') or 0)
-#         timeseries_limit_metric = form_data.get('timeseries_limit_metric')
-#         row_limit = int(form_data.get('row_limit') or config.get('ROW_LIMIT'))
-#
-#         # default order direction
-#         order_desc = form_data.get('order_desc', True)
-#
-#         since, until = utils.get_since_until(relative_end=relative_end,
-#                                              time_range=form_data.get('time_range'),
-#                                              since=form_data.get('since'),
-#                                              until=form_data.get('until'))
-#         time_shift = form_data.get('time_shift', '')
-#         self.time_shift = utils.parse_human_timedelta(time_shift)
-#         from_dttm = None if since is None else (since - self.time_shift)
-#         to_dttm = None if until is None else (until - self.time_shift)
-#         if from_dttm and to_dttm and from_dttm > to_dttm:
-#             raise Exception(_('From date cannot be larger than to date'))
-#
-#         self.from_dttm = from_dttm
-#         self.to_dttm = to_dttm
-#
-#         # extras are used to query elements specific to a datasource type
-#         # for instance the extra where clause that applies only to Tables
-#         extras = {
-#             'where': form_data.get('where', ''),
-#             'having': form_data.get('having', ''),
-#             'having_druid': form_data.get('having_filters', []),
-#             'time_grain_sqla': form_data.get('time_grain_sqla', ''),
-#             'druid_time_origin': form_data.get('druid_time_origin', ''),
-#         }
-#
-#         d = {
-#             'granularity': granularity,
-#             'from_dttm': from_dttm,
-#             'to_dttm': to_dttm,
-#             'is_timeseries': is_timeseries,
-#             'groupby': groupby,
-#             'metrics': metrics,
-#             'row_limit': row_limit,
-#             'filter': self.form_data.get('filters', []),
-#             'timeseries_limit': limit,
-#             'extras': extras,
-#             'timeseries_limit_metric': timeseries_limit_metric,
-#             'order_desc': order_desc,
-#             'prequeries': [],
-#             'is_prequery': False,
-#         }
-#         return d
-#
-#     @property
-#     def cache_timeout(self):
-#         if self.form_data.get('cache_timeout') is not None:
-#             return int(self.form_data.get('cache_timeout'))
-#         if self.datasource.cache_timeout is not None:
-#             return self.datasource.cache_timeout
-#         if (
-#                     hasattr(self.datasource, 'database') and
-#                     self.datasource.database.cache_timeout) is not None:
-#             return self.datasource.database.cache_timeout
-#         return config.get('CACHE_DEFAULT_TIMEOUT')
-#
-#     def get_json(self):
-#         return json.dumps(
-#             self.get_payload(),
-#             default=utils.json_int_dttm_ser, ignore_nan=True)
-#
-#     def cache_key(self, query_obj, **extra):
-#         """
-#         The cache key is made out of the key/values in `query_obj`, plus any
-#         other key/values in `extra`.
-#
-#         We remove datetime bounds that are hard values, and replace them with
-#         the use-provided inputs to bounds, which may be time-relative (as in
-#         "5 days ago" or "now").
-#
-#         The `extra` arguments are currently used by time shift queries, since
-#         different time shifts wil differ only in the `from_dttm` and `to_dttm`
-#         values which are stripped.
-#         """
-#         cache_dict = copy.copy(query_obj)
-#         cache_dict.update(extra)
-#
-#         print("_____cache_____", cache_dict)
-#
-#         i = 0
-#         json_data = ""
-#         if cache_dict.get(str(i)):
-#             while True:
-#                 if not cache_dict.get(str(i)): break;
-#                 #print("______cache_in_____", cache_dict[str(i)])
-#                 for k in ['from_dttm', 'to_dttm']:
-#                     if cache_dict[str(i)].get(k):
-#                         del cache_dict[str(i)][k]
-#
-#                 cache_dict[str(i)]['time_range'] = self.form_data.get('time_range')
-#                 cache_dict[str(i)]['datasource'] = self.datasource.uid
-#                 json_data += self.json_dumps(cache_dict[str(i)], sort_keys=True)
-#                 i += 1
-#         else:
-#             for k in ['from_dttm', 'to_dttm']:
-#                 del cache_dict[k]
-#
-#             cache_dict['time_range'] = self.form_data.get('time_range')
-#             cache_dict['datasource'] = self.datasource.uid
-#             json_data = self.json_dumps(cache_dict,sort_keys=True)
-#         return hashlib.md5(json_data.encode('utf-8')).hexdigest()
-#
-#     def get_payload(self, query_obj=None):
-#         """Returns a payload of metadata and data"""
-#         self.run_extra_queries()
-#         payload = self.get_df_payload(query_obj)
-#
-#         df = payload.get('df')
-#
-#         if self.status != utils.QueryStatus.FAILED:
-#             if df is not None and df.empty:
-#                 payload['error'] = 'No data'
-#             else:
-#                 payload['data'] = self.get_data(df)
-#         if 'df' in payload:
-#             del payload['df']
-#         # print("___payload__\n", payload)
-#         return payload
-#
-#     def get_df_payload(self, query_obj=None, **kwargs):
-#         """Handles caching around the df payload retrieval"""
-#         # logging.debug("____payload_1___\n%s", query_obj)
-#         if not query_obj:
-#             query_obj = self.query_obj()
-#             # logging.debug("___payload_2__\n%s", query_obj)
-#         cache_key = self.cache_key(query_obj) if query_obj else None
-#         logging.info('Cache key: {}'.format(cache_key))
-#         is_loaded = False
-#         stacktrace = None
-#         df = None
-#         cached_dttm = datetime.utcnow().isoformat().split('.')[0]
-#         if cache_key and cache and not self.force:
-#             cache_value = cache.get(cache_key)
-#             if cache_value:
-#                 stats_logger.incr('loaded_from_cache')
-#                 try:
-#                     cache_value = pkl.loads(cache_value)
-#                     df = cache_value['df']
-#                     self.query = cache_value['query']
-#                     self._any_cached_dttm = cache_value['dttm']
-#                     self._any_cache_key = cache_key
-#                     self.status = utils.QueryStatus.SUCCESS
-#                     is_loaded = True
-#                 except Exception as e:
-#                     logging.exception(e)
-#                     logging.error('Error reading cache: ' +
-#                                   utils.error_msg_from_exception(e))
-#                 logging.info('Serving from cache')
-#
-#         if query_obj:
-#             if '0' in query_obj.keys():
-#                 logging.debug("__pay_load_3__");
-#                 return {
-#                     'cache_key': self._any_cache_key,
-#                     'cached_dttm': self._any_cached_dttm,
-#                     'cache_timeout': self.cache_timeout,
-#                     'df': df,
-#                     'error': self.error_message,
-#                     'form_data': self.form_data,
-#                     'is_cached': self._any_cache_key is not None,
-#                     'query': self.query,
-#                     'status': self.status,
-#                     'stacktrace': stacktrace,
-#                     'rowcount': len(df.index) if df is not None else 0,
-#                 }
-#
-#         if query_obj and not is_loaded:
-#             try:
-#                 df = self.get_df(query_obj)
-#                 if self.status != utils.QueryStatus.FAILED:
-#                     stats_logger.incr('loaded_from_source')
-#                     is_loaded = True
-#             except Exception as e:
-#                 logging.exception(e)
-#                 if not self.error_message:
-#                     self.error_message = '{}'.format(e)
-#                 self.status = utils.QueryStatus.FAILED
-#                 stacktrace = traceback.format_exc()
-#
-#             if (
-#                     is_loaded and
-#                     cache_key and
-#                     cache and
-#                     self.status != utils.QueryStatus.FAILED):
-#                 try:
-#                     cache_value = dict(
-#                         dttm=cached_dttm,
-#                         df=df if df is not None else None,
-#                         query=self.query,
-#                     )
-#                     cache_value = pkl.dumps(
-#                         cache_value, protocol=pkl.HIGHEST_PROTOCOL)
-#
-#                     logging.info('Caching {} chars at key {}'.format(
-#                         len(cache_value), cache_key))
-#
-#                     stats_logger.incr('set_cache_key')
-#                     cache.set(
-#                         cache_key,
-#                         cache_value,
-#                         timeout=self.cache_timeout)
-#                 except Exception as e:
-#                     # cache.set call can fail if the backend is down or if
-#                     # the key is too large or whatever other reasons
-#                     logging.warning('Could not cache key {}'.format(cache_key))
-#                     logging.exception(e)
-#                     cache.delete(cache_key)
-#
-#         # logging.debug("___pay_load_4___\n%s", df)
-#         return {
-#             'cache_key': self._any_cache_key,
-#             'cached_dttm': self._any_cached_dttm,
-#             'cache_timeout': self.cache_timeout,
-#             'df': df,
-#             'error': self.error_message,
-#             'form_data': self.form_data,
-#             'is_cached': self._any_cache_key is not None,
-#             'query': self.query,
-#             'status': self.status,
-#             'stacktrace': stacktrace,
-#             'rowcount': len(df.index) if df is not None else 0,
-#         }
-#
-#     def json_dumps(self, obj, sort_keys=False):
-#         return json.dumps(
-#             obj,
-#             default=utils.json_int_dttm_ser,
-#             ignore_nan=True,
-#             sort_keys=sort_keys,
-#         )
-#
-#     def payload_json_and_has_error(self, payload):
-#         has_error = payload.get('status') == utils.QueryStatus.FAILED or \
-#                     payload.get('error') is not None
-#         return self.json_dumps(payload), has_error
-#
-#     @property
-#     def data(self):
-#         """This is the data object serialized to the js layer"""
-#         content = {
-#             'form_data': self.form_data,
-#             'token': self.token,
-#             'viz_name': self.viz_type,
-#             'filter_select_enabled': self.datasource.filter_select_enabled,
-#         }
-#         return content
-#
-#     def get_csv(self):
-#         df = self.get_df()
-#         include_index = not isinstance(df.index, pd.RangeIndex)
-#         return df.to_csv(index=include_index, **config.get('CSV_EXPORT'))
-#
-#     def get_data(self, df):
-#         return df.to_dict(orient='records')
-#
-#     @property
-#     def json_data(self):
-#         return json.dumps(self.data)
+class BaseViz(object):
+
+    """All visualizations derive this base class"""
+
+    viz_type = None
+    verbose_name = 'Base Viz'
+    credits = ''
+    is_timeseries = False
+    default_fillna = 0
+    cache_type = 'df'
+    enforce_numerical_metrics = True
+
+    def __init__(self, datasource, form_data, force=False):
+        if not datasource:
+            raise Exception(_('Viz is missing a datasource'))
+
+        self.datasource = datasource
+        self.request = request
+        self.viz_type = form_data.get('viz_type')
+        self.form_data = form_data
+
+        self.query = ''
+        self.token = self.form_data.get(
+            'token', 'token_' + uuid.uuid4().hex[:8])
+
+        self.groupby = self.form_data.get('groupby') or []
+        self.time_shift = timedelta()
+
+        self.status = None
+        self.error_msg = ''
+        self.results = None
+        self.error_message = None
+        self.force = force
+
+        # Keeping track of whether some data came from cache
+        # this is useful to trigger the <CachedLabel /> when
+        # in the cases where visualization have many queries
+        # (FilterBox for instance)
+        self._some_from_cache = False
+        self._any_cache_key = None
+        self._any_cached_dttm = None
+        self._extra_chart_data = []
+
+        self.process_metrics()
+
+    def process_metrics(self):
+        # metrics in TableViz is order sensitive, so metric_dict should be
+        # OrderedDict
+        self.metric_dict = OrderedDict()
+        fd = self.form_data
+        for mkey in METRIC_KEYS:
+            val = fd.get(mkey)
+            if val:
+                if not isinstance(val, list):
+                    val = [val]
+                for o in val:
+                    label = utils.get_metric_name(o)
+                    self.metric_dict[label] = o
+
+        # Cast to list needed to return serializable object in py3
+        self.all_metrics = list(self.metric_dict.values())
+        self.metric_labels = list(self.metric_dict.keys())
+
+    @staticmethod
+    def handle_js_int_overflow(data):
+        for d in data.get('records', dict()):
+            for k, v in list(d.items()):
+                if isinstance(v, int):
+                    # if an int is too big for Java Script to handle
+                    # convert it to a string
+                    if abs(v) > JS_MAX_INTEGER:
+                        d[k] = str(v)
+        return data
+
+    def run_extra_queries(self):
+        """Lifecycle method to use when more than one query is needed
+
+        In rare-ish cases, a visualization may need to execute multiple
+        queries. That is the case for FilterBox or for time comparison
+        in Line chart for instance.
+
+        In those cases, we need to make sure these queries run before the
+        main `get_payload` method gets called, so that the overall caching
+        metadata can be right. The way it works here is that if any of
+        the previous `get_df_payload` calls hit the cache, the main
+        payload's metadata will reflect that.
+
+        The multi-query support may need more work to become a first class
+        use case in the framework, and for the UI to reflect the subtleties
+        (show that only some of the queries were served from cache for
+        instance). In the meantime, since multi-query is rare, we treat
+        it with a bit of a hack. Note that the hack became necessary
+        when moving from caching the visualization's data itself, to caching
+        the underlying query(ies).
+        """
+        pass
+
+    def handle_nulls(self, df):
+        fillna = self.get_fillna_for_columns(df.columns)
+        return df.fillna(fillna)
+
+    def get_fillna_for_col(self, col):
+        """Returns the value to use as filler for a specific Column.type"""
+        if col:
+            if col.is_string:
+                return ' NULL'
+        return self.default_fillna
+
+    def get_fillna_for_columns(self, columns=None):
+        """Returns a dict or scalar that can be passed to DataFrame.fillna"""
+        if columns is None:
+            return self.default_fillna
+        columns_dict = {col.column_name: col for col in self.datasource.columns}
+        fillna = {
+            c: self.get_fillna_for_col(columns_dict.get(c))
+            for c in columns
+        }
+        return fillna
+
+    def get_samples(self):
+        query_obj = self.query_obj()
+        query_obj.update({
+            'groupby': [],
+            'metrics': [],
+            'row_limit': 1000,
+            'columns': [o.column_name for o in self.datasource.columns],
+        })
+        df = self.get_df(query_obj)
+        return df.to_dict(orient='records')
+
+    def get_df(self, query_obj=None):
+        """Returns a pandas dataframe based on the query object"""
+        if not query_obj:
+            query_obj = self.query_obj()
+        if not query_obj:
+            return None
+
+        self.error_msg = ''
+
+        timestamp_format = None
+        if self.datasource.type == 'table':
+            dttm_col = self.datasource.get_col(query_obj['granularity'])
+            if dttm_col:
+                timestamp_format = dttm_col.python_date_format
+
+        # The datasource here can be different backend but the interface is common
+        self.results = self.datasource.query(query_obj)
+        self.query = self.results.query
+        self.status = self.results.status
+        self.error_message = self.results.error_message
+
+        df = self.results.df
+        # Transform the timestamp we received from database to pandas supported
+        # datetime format. If no python_date_format is specified, the pattern will
+        # be considered as the default ISO date format
+        # If the datetime format is unix, the parse will use the corresponding
+        # parsing logic.
+        if df is not None and not df.empty:
+            if DTTM_ALIAS in df.columns:
+                if timestamp_format in ('epoch_s', 'epoch_ms'):
+                    # Column has already been formatted as a timestamp.
+                    dttm_col = df[DTTM_ALIAS]
+                    one_ts_val = dttm_col[0]
+
+                    # convert time column to pandas Timestamp, but different
+                    # ways to convert depending on string or int types
+                    try:
+                        int(one_ts_val)
+                        is_integral = True
+                    except ValueError:
+                        is_integral = False
+                    if is_integral:
+                        unit = 's' if timestamp_format == 'epoch_s' else 'ms'
+                        df[DTTM_ALIAS] = pd.to_datetime(dttm_col, utc=False, unit=unit,
+                                                        origin='unix')
+                    else:
+                        df[DTTM_ALIAS] = dttm_col.apply(pd.Timestamp)
+                else:
+                    df[DTTM_ALIAS] = pd.to_datetime(
+                        df[DTTM_ALIAS], utc=False, format=timestamp_format)
+                if self.datasource.offset:
+                    df[DTTM_ALIAS] += timedelta(hours=self.datasource.offset)
+                df[DTTM_ALIAS] += self.time_shift
+
+            if self.enforce_numerical_metrics:
+                self.df_metrics_to_num(df)
+
+            df.replace([np.inf, -np.inf], np.nan)
+            df = self.handle_nulls(df)
+
+        # global global_flag
+        # if global_flag:
+        #     df = df.from_dict(global_dd)
+        #     global_flag = False
+
+        # logging.debug("____base_get_df________",df)
+
+        return df
+
+    def df_metrics_to_num(self, df):
+        """Converting metrics to numeric when pandas.read_sql cannot"""
+        metrics = self.metric_labels
+        for col, dtype in df.dtypes.items():
+            if dtype.type == np.object_ and col in metrics:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+
+    def process_query_filters(self):
+        utils.convert_legacy_filters_into_adhoc(self.form_data)
+        merge_extra_filters(self.form_data)
+        utils.split_adhoc_filters_into_base_filters(self.form_data)
+
+    def query_obj(self):
+        """Building a query object"""
+        # print("_____________BaseViz_____Query_obj____________\n",self.form_data)
+
+        # for updateed form data
+        self.process_metrics()
+
+        form_data = self.form_data
+        self.process_query_filters()
+        gb = form_data.get('groupby') or []
+        metrics = self.all_metrics or []
+        columns = form_data.get('columns') or []
+        groupby = []
+        for o in gb + columns:
+            if o not in groupby:
+                groupby.append(o)
+
+        # print("_________", groupby, "\n",self.all_metrics)
+
+        is_timeseries = self.is_timeseries
+        if DTTM_ALIAS in groupby:
+            groupby.remove(DTTM_ALIAS)
+            is_timeseries = True
+
+        granularity = (
+            form_data.get('granularity') or
+            form_data.get('granularity_sqla')
+        )
+        limit = int(form_data.get('limit') or 0)
+        timeseries_limit_metric = form_data.get('timeseries_limit_metric')
+        row_limit = int(form_data.get('row_limit') or config.get('ROW_LIMIT'))
+
+        # default order direction
+        order_desc = form_data.get('order_desc', True)
+
+        since, until = utils.get_since_until(relative_end=relative_end,
+                                             time_range=form_data.get('time_range'),
+                                             since=form_data.get('since'),
+                                             until=form_data.get('until'))
+        time_shift = form_data.get('time_shift', '')
+        self.time_shift = utils.parse_human_timedelta(time_shift)
+        from_dttm = None if since is None else (since - self.time_shift)
+        to_dttm = None if until is None else (until - self.time_shift)
+        if from_dttm and to_dttm and from_dttm > to_dttm:
+            raise Exception(_('From date cannot be larger than to date'))
+
+        self.from_dttm = from_dttm
+        self.to_dttm = to_dttm
+
+        # extras are used to query elements specific to a datasource type
+        # for instance the extra where clause that applies only to Tables
+        extras = {
+            'where': form_data.get('where', ''),
+            'having': form_data.get('having', ''),
+            'having_druid': form_data.get('having_filters', []),
+            'time_grain_sqla': form_data.get('time_grain_sqla', ''),
+            'druid_time_origin': form_data.get('druid_time_origin', ''),
+        }
+
+        d = {
+            'granularity': granularity,
+            'from_dttm': from_dttm,
+            'to_dttm': to_dttm,
+            'is_timeseries': is_timeseries,
+            'groupby': groupby,
+            'metrics': metrics,
+            'row_limit': row_limit,
+            'filter': self.form_data.get('filters', []),
+            'timeseries_limit': limit,
+            'extras': extras,
+            'timeseries_limit_metric': timeseries_limit_metric,
+            'order_desc': order_desc,
+            'prequeries': [],
+            'is_prequery': False,
+        }
+        return d
+
+    @property
+    def cache_timeout(self):
+        if self.form_data.get('cache_timeout') is not None:
+            return int(self.form_data.get('cache_timeout'))
+        if self.datasource.cache_timeout is not None:
+            return self.datasource.cache_timeout
+        if (
+                    hasattr(self.datasource, 'database') and
+                    self.datasource.database.cache_timeout) is not None:
+            return self.datasource.database.cache_timeout
+        return config.get('CACHE_DEFAULT_TIMEOUT')
+
+    def get_json(self):
+        return json.dumps(
+            self.get_payload(),
+            default=utils.json_int_dttm_ser, ignore_nan=True)
+
+    def cache_key(self, query_obj, **extra):
+        """
+        The cache key is made out of the key/values in `query_obj`, plus any
+        other key/values in `extra`.
+
+        We remove datetime bounds that are hard values, and replace them with
+        the use-provided inputs to bounds, which may be time-relative (as in
+        "5 days ago" or "now").
+
+        The `extra` arguments are currently used by time shift queries, since
+        different time shifts wil differ only in the `from_dttm` and `to_dttm`
+        values which are stripped.
+        """
+        cache_dict = copy.copy(query_obj)
+        cache_dict.update(extra)
+
+        print("_____cache_____", cache_dict)
+
+        i = 0
+        json_data = ""
+        if cache_dict.get(str(i)):
+            while True:
+                if not cache_dict.get(str(i)): break;
+                #print("______cache_in_____", cache_dict[str(i)])
+                for k in ['from_dttm', 'to_dttm']:
+                    if cache_dict[str(i)].get(k):
+                        del cache_dict[str(i)][k]
+
+                cache_dict[str(i)]['time_range'] = self.form_data.get('time_range')
+                cache_dict[str(i)]['datasource'] = self.datasource.uid
+                json_data += self.json_dumps(cache_dict[str(i)], sort_keys=True)
+                i += 1
+        else:
+            for k in ['from_dttm', 'to_dttm']:
+                del cache_dict[k]
+
+            cache_dict['time_range'] = self.form_data.get('time_range')
+            cache_dict['datasource'] = self.datasource.uid
+            json_data = self.json_dumps(cache_dict,sort_keys=True)
+        return hashlib.md5(json_data.encode('utf-8')).hexdigest()
+
+    def get_payload(self, query_obj=None):
+        """Returns a payload of metadata and data"""
+        self.run_extra_queries()
+        payload = self.get_df_payload(query_obj)
+
+        df = payload.get('df')
+
+        if self.status != utils.QueryStatus.FAILED:
+            if df is not None and df.empty:
+                payload['error'] = 'No data'
+            else:
+                payload['data'] = self.get_data(df)
+        if 'df' in payload:
+            del payload['df']
+        # print("___payload__\n", payload)
+        return payload
+
+    def get_df_payload(self, query_obj=None, **kwargs):
+        """Handles caching around the df payload retrieval"""
+        # logging.debug("____payload_1___\n%s", query_obj)
+        if not query_obj:
+            query_obj = self.query_obj()
+            # logging.debug("___payload_2__\n%s", query_obj)
+        cache_key = self.cache_key(query_obj) if query_obj else None
+        logging.info('Cache key: {}'.format(cache_key))
+        is_loaded = False
+        stacktrace = None
+        df = None
+        cached_dttm = datetime.utcnow().isoformat().split('.')[0]
+        if cache_key and cache and not self.force:
+            cache_value = cache.get(cache_key)
+            if cache_value:
+                stats_logger.incr('loaded_from_cache')
+                try:
+                    cache_value = pkl.loads(cache_value)
+                    df = cache_value['df']
+                    self.query = cache_value['query']
+                    self._any_cached_dttm = cache_value['dttm']
+                    self._any_cache_key = cache_key
+                    self.status = utils.QueryStatus.SUCCESS
+                    is_loaded = True
+                except Exception as e:
+                    logging.exception(e)
+                    logging.error('Error reading cache: ' +
+                                  utils.error_msg_from_exception(e))
+                logging.info('Serving from cache')
+
+        if query_obj:
+            if '0' in query_obj.keys():
+                logging.debug("__pay_load_3__");
+                return {
+                    'cache_key': self._any_cache_key,
+                    'cached_dttm': self._any_cached_dttm,
+                    'cache_timeout': self.cache_timeout,
+                    'df': df,
+                    'error': self.error_message,
+                    'form_data': self.form_data,
+                    'is_cached': self._any_cache_key is not None,
+                    'query': self.query,
+                    'status': self.status,
+                    'stacktrace': stacktrace,
+                    'rowcount': len(df.index) if df is not None else 0,
+                }
+
+        if query_obj and not is_loaded:
+            try:
+                df = self.get_df(query_obj)
+                if self.status != utils.QueryStatus.FAILED:
+                    stats_logger.incr('loaded_from_source')
+                    is_loaded = True
+            except Exception as e:
+                logging.exception(e)
+                if not self.error_message:
+                    self.error_message = '{}'.format(e)
+                self.status = utils.QueryStatus.FAILED
+                stacktrace = traceback.format_exc()
+
+            if (
+                    is_loaded and
+                    cache_key and
+                    cache and
+                    self.status != utils.QueryStatus.FAILED):
+                try:
+                    cache_value = dict(
+                        dttm=cached_dttm,
+                        df=df if df is not None else None,
+                        query=self.query,
+                    )
+                    cache_value = pkl.dumps(
+                        cache_value, protocol=pkl.HIGHEST_PROTOCOL)
+
+                    logging.info('Caching {} chars at key {}'.format(
+                        len(cache_value), cache_key))
+
+                    stats_logger.incr('set_cache_key')
+                    cache.set(
+                        cache_key,
+                        cache_value,
+                        timeout=self.cache_timeout)
+                except Exception as e:
+                    # cache.set call can fail if the backend is down or if
+                    # the key is too large or whatever other reasons
+                    logging.warning('Could not cache key {}'.format(cache_key))
+                    logging.exception(e)
+                    cache.delete(cache_key)
+
+        # logging.debug("___pay_load_4___\n%s", df)
+        return {
+            'cache_key': self._any_cache_key,
+            'cached_dttm': self._any_cached_dttm,
+            'cache_timeout': self.cache_timeout,
+            'df': df,
+            'error': self.error_message,
+            'form_data': self.form_data,
+            'is_cached': self._any_cache_key is not None,
+            'query': self.query,
+            'status': self.status,
+            'stacktrace': stacktrace,
+            'rowcount': len(df.index) if df is not None else 0,
+        }
+
+    def json_dumps(self, obj, sort_keys=False):
+        return json.dumps(
+            obj,
+            default=utils.json_int_dttm_ser,
+            ignore_nan=True,
+            sort_keys=sort_keys,
+        )
+
+    def payload_json_and_has_error(self, payload):
+        has_error = payload.get('status') == utils.QueryStatus.FAILED or \
+                    payload.get('error') is not None
+        return self.json_dumps(payload), has_error
+
+    @property
+    def data(self):
+        """This is the data object serialized to the js layer"""
+        content = {
+            'form_data': self.form_data,
+            'token': self.token,
+            'viz_name': self.viz_type,
+            'filter_select_enabled': self.datasource.filter_select_enabled,
+        }
+        return content
+
+    def get_csv(self):
+        df = self.get_df()
+        include_index = not isinstance(df.index, pd.RangeIndex)
+        return df.to_csv(index=include_index, **config.get('CSV_EXPORT'))
+
+    def get_data(self, df):
+        return df.to_dict(orient='records')
+
+    @property
+    def json_data(self):
+        return json.dumps(self.data)
 
 
 class FunnelViz(BaseViz):
