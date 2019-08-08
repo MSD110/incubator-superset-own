@@ -2695,50 +2695,50 @@ def geohash_to_json(geohash_code):
     ]
 
 
-class DeckPathViz(BaseDeckGLViz):
-    """deck.gl's PathLayer"""
-
-    viz_type = 'deck_path'
-    verbose_name = _('Deck.gl - Paths')
-    deck_viz_key = 'path'
-    is_timeseries = True
-    deser_map = {
-        'json': json.loads,
-        'polyline': polyline.decode,
-        'geohash': geohash_to_json,
-    }
-
-    def query_obj(self):
-        fd = self.form_data
-        self.is_timeseries = fd.get('time_grain_sqla') or fd.get('granularity')
-        d = super(DeckPathViz, self).query_obj()
-        self.metric = fd.get('metric')
-        line_col = fd.get('line_column')
-        if d['metrics']:
-            self.has_metrics = True
-            d['groupby'].append(line_col)
-        else:
-            self.has_metrics = False
-            d['columns'].append(line_col)
-        return d
-
-    def get_properties(self, d):
-        fd = self.form_data
-        line_type = fd.get('line_type')
-        deser = self.deser_map[line_type]
-        line_column = fd.get('line_column')
-        path = deser(d[line_column])
-        if fd.get('reverse_long_lat'):
-            path = [(o[1], o[0]) for o in path]
-        d[self.deck_viz_key] = path
-        if line_type != 'geohash':
-            del d[line_column]
-        d['__timestamp'] = d.get(DTTM_ALIAS) or d.get('__time')
-        return d
-
-    def get_data(self, df):
-        self.metric_label = utils.get_metric_name(self.metric)
-        return super(DeckPathViz, self).get_data(df)
+# class DeckPathViz(BaseDeckGLViz):
+#     """deck.gl's PathLayer"""
+#
+#     viz_type = 'deck_path'
+#     verbose_name = _('Deck.gl - Paths')
+#     deck_viz_key = 'path'
+#     is_timeseries = True
+#     deser_map = {
+#         'json': json.loads,
+#         'polyline': polyline.decode,
+#         'geohash': geohash_to_json,
+#     }
+#
+#     def query_obj(self):
+#         fd = self.form_data
+#         self.is_timeseries = fd.get('time_grain_sqla') or fd.get('granularity')
+#         d = super(DeckPathViz, self).query_obj()
+#         self.metric = fd.get('metric')
+#         line_col = fd.get('line_column')
+#         if d['metrics']:
+#             self.has_metrics = True
+#             d['groupby'].append(line_col)
+#         else:
+#             self.has_metrics = False
+#             d['columns'].append(line_col)
+#         return d
+#
+#     def get_properties(self, d):
+#         fd = self.form_data
+#         line_type = fd.get('line_type')
+#         deser = self.deser_map[line_type]
+#         line_column = fd.get('line_column')
+#         path = deser(d[line_column])
+#         if fd.get('reverse_long_lat'):
+#             path = [(o[1], o[0]) for o in path]
+#         d[self.deck_viz_key] = path
+#         if line_type != 'geohash':
+#             del d[line_column]
+#         d['__timestamp'] = d.get(DTTM_ALIAS) or d.get('__time')
+#         return d
+#
+#     def get_data(self, df):
+#         self.metric_label = utils.get_metric_name(self.metric)
+#         return super(DeckPathViz, self).get_data(df)
 
 
 class DeckPolygon(DeckPathViz):
