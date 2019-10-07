@@ -70,7 +70,7 @@ global_flag = False
 global_query = {}
 
 
-class BaseViz(object):
+# class BaseViz(object):
 
     """All visualizations derive this base class"""
 
@@ -571,7 +571,7 @@ class BaseViz(object):
 
     @property
     def json_data(self):
-        return json.dumps(self.data)
+        # return json.dumps(self.data)
 
 
 class FunnelViz(BaseViz):
