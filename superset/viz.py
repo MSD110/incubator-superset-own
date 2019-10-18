@@ -720,7 +720,7 @@ class FunnelViz(BaseViz):
         return d
 
 
-# class TableDrillDownViz(BaseViz):
+class TableDrillDownViz(BaseViz):
 
     viz_type = 'table_drill_down'
     verbose_name = _('Table Drill Down View')
