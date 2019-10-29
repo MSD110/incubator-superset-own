@@ -1214,7 +1214,7 @@ class NVD3Viz(BaseViz):
     is_timeseries = False
 
 
-# class BoxPlotViz(NVD3Viz):
+class BoxPlotViz(NVD3Viz):
     """Box plot viz from ND3"""
 
     viz_type = 'box_plot'
