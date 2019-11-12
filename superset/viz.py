@@ -1417,7 +1417,7 @@ class BigNumberViz(BaseViz):
         return d
 
 
-# class BigNumberTotalViz(BaseViz):
+class BigNumberTotalViz(BaseViz):
     """Put emphasis on a single metric with this big number viz"""
 
     viz_type = 'big_number_total'
