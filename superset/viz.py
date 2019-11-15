@@ -1627,7 +1627,7 @@ class NVD3TimeSeriesViz(NVD3Viz):
         return chart_data
 
 
-# class MultiLineViz(NVD3Viz):
+class MultiLineViz(NVD3Viz):
     """Pile on multiple line charts"""
 
     viz_type = 'line_multi'
