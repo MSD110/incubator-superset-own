@@ -1655,7 +1655,7 @@ class MultiLineViz(NVD3Viz):
         }
 
 
-# class NVD3DualLineViz(NVD3Viz):
+class NVD3DualLineViz(NVD3Viz):
     """A rich line chart with dual axis"""
 
     viz_type = 'dual_line'
