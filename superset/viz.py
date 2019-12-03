@@ -2438,7 +2438,7 @@ class DeckGLMultiLayer(BaseViz):
         }
 
 
-# class BaseDeckGLViz(BaseViz):
+class BaseDeckGLViz(BaseViz):
     """Base class for deck.gl visualizations"""
 
     is_timeseries = False
