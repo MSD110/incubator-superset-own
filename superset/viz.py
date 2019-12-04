@@ -2597,7 +2597,7 @@ class BaseDeckGLViz(BaseViz):
         raise NotImplementedError()
 
 
-class DeckScatterViz(BaseDeckGLViz):
+# class DeckScatterViz(BaseDeckGLViz):
     """deck.gl's ScatterLayer"""
 
     viz_type = 'deck_scatter'
