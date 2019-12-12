@@ -2666,7 +2666,7 @@ class DeckScreengrid(BaseDeckGLViz):
         return super(DeckScreengrid, self).get_data(df)
 
 
-# class DeckGrid(BaseDeckGLViz):
+class DeckGrid(BaseDeckGLViz):
     """deck.gl's DeckLayer"""
 
     viz_type = 'deck_grid'
